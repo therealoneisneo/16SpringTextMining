@@ -72,6 +72,7 @@ public class DocAnalyzer {
 				line = SnowballStemming(Normalization(line));
 				if (!line.isEmpty())
 					m_stopwords.add(line);
+					System.out.println(line);
 			}
 			reader.close();
 			System.out.format("Loading %d stopwords from %s\n", m_stopwords.size(), filename);
@@ -205,10 +206,13 @@ public class DocAnalyzer {
 		DocAnalyzer analyzer = new DocAnalyzer("./data/Model/en-token.bin", 2);
 		
 		//code for demonstrating tokenization and stemming
-		analyzer.TokenizerDemon("I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
+		// analyzer.TokenizerDemon("I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
+		// analyzer.TokenizerDemon("this is just a test sentence for the function");
 			
 		//entry point to deal with a collection of documents
 		analyzer.LoadDirectory("./Data/yelp/train", ".json");
+		// analyzer.LoadStopwords("init_stop_words.txt");
+		System.out.println("complete");
 	}
 
 }
