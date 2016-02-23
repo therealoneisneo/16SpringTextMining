@@ -120,9 +120,9 @@ public class DocAnalyzer {
 					{
 						tok = Normalization(tok);
 						if (tok.length() == 0){break;}
-						dfcheck.add(tok);
 						if (!m_stopwords.contains(tok))
 						{
+							dfcheck.add(tok);
 							if (m_stats.containsKey(tok))
 							{
 								Token temp = m_stats.get(tok);
@@ -330,7 +330,7 @@ public class DocAnalyzer {
 		FileWriter fw = null;
 		try
 		{
-			fw = new FileWriter("Filename");
+			fw = new FileWriter(Filename);
 			String title = "Key,Value\r\n";
 			fw.write(title);
 			
@@ -377,7 +377,7 @@ public class DocAnalyzer {
 		all_DFs.putAll(analyzer2.m_dfstats);
 		DocAnalyzer.ZipfsLaw(all_TFs, "tf_result.csv");
 		DocAnalyzer.ZipfsLaw(all_DFs, "df_result.csv");
-		
+		System.out.println(analyzer.m_train_num);
 		
 //		System.out.println(all_tokens.size());
 
