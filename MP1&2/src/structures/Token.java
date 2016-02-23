@@ -26,7 +26,6 @@ public class Token {
 	public void setToken(String token) {
 		this.m_token = token;
 	}
-
 	double m_value; // frequency or count of this token/N-gram
 	public double getValue() {
 		return m_value;
