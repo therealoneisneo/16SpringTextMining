@@ -48,6 +48,7 @@ public class DocAnalyzer {
 	int m_test_num; // the number of test examples
 	//a list of stopwords
 	HashSet<String> m_stopwords;
+	HashSet<String> m_CtrlVocabulary;
 	
 	//you can store the loaded reviews in this arraylist for further processing
 //	ArrayList<Post> m_Train_reviews;
@@ -98,7 +99,8 @@ public class DocAnalyzer {
 		}
 	}
 	
-
+	public void BuildCtrlVocab()
+	{}
 	
 	
 	
@@ -193,7 +195,7 @@ public class DocAnalyzer {
 				
 				
 				m_reviews.add(review);
-				System.out.println(m_stats.size());
+				
 
 			}
 		} catch (JSONException e) {
@@ -243,7 +245,10 @@ public class DocAnalyzer {
 		int size = m_reviews.size();
 		for (File f : dir.listFiles()) {
 			if (f.isFile() && f.getName().endsWith(suffix))
+			{
 				analyzeDocument(LoadJson(f.getAbsolutePath()));
+				System.out.println(m_stats.size());
+			}
 			else if (f.isDirectory())
 				LoadDirectory(f.getAbsolutePath(), suffix);
 		}
@@ -344,7 +349,40 @@ public class DocAnalyzer {
 		} catch (IOException e){e.printStackTrace();}
 	}
 	
-	
+	public static List<Map.Entry<String, Token>> TfIdfCalc(HashMap<String, Token> m_dfstats, String Filename)// calc the tfidf of the token in the vocabulary 
+	{
+
+		List<Map.Entry<String, Token>> entrylist = new ArrayList<Map.Entry<String, Token>>(m_dfstats.entrySet());
+		List<Map.Entry<String, Token>> ControlV = new ArrayList<Map.Entry<String, Token>>();//the List to store all controlled vocabulary
+		
+		Collections.sort(entrylist, new Comparator<Map.Entry<String, Token>>()
+			{public int compare(Map.Entry<String, Token> o1, Map.Entry<String, Token> o2)
+				{
+					return((int)o2.getValue().getValue() - (int)o1.getValue().getValue());
+				}
+			});
+		FileWriter fw = null;
+		try
+		{
+			fw = new FileWriter(Filename);
+			String title = "Key,Value\r\n";
+			fw.write(title);
+			int cut = 0;
+			for (Entry<String, Token> entry : entrylist)
+			{
+				cut = cut + 1;
+				if (cut < 100)
+					continue;
+				if (entry.getValue().getValue() < 50)
+					break;
+				ControlV.add(entry);
+				System.out.println(entry.getKey() + "\t" + entry.getValue().getValue());
+				fw.write(entry.getKey() + "," + entry.getValue().getValue()+ "\r\n"); 
+			}
+			 fw.close(); 
+		} catch (IOException e){e.printStackTrace();}
+		return ControlV;
+	}
 	
 	public void TokenizerDemon(String text) {
 		System.out.format("Token\tNormalization\tSnonball Stemmer\tPorter Stemmer\n");
@@ -375,8 +413,10 @@ public class DocAnalyzer {
 		all_TFs.putAll(analyzer2.m_stats);
 		all_DFs.putAll(analyzer.m_dfstats);
 		all_DFs.putAll(analyzer2.m_dfstats);
-		DocAnalyzer.ZipfsLaw(all_TFs, "tf_result.csv");
-		DocAnalyzer.ZipfsLaw(all_DFs, "df_result.csv");
+//		DocAnalyzer.ZipfsLaw(all_TFs, "tf_result.csv");
+//		DocAnalyzer.ZipfsLaw(all_DFs, "df_result.csv");
+		List<Map.Entry<String, Token>> CVocabulary;
+		CVocabulary = DocAnalyzer.TfIdfCalc(all_DFs, "Controled.csv");
 		System.out.println(analyzer.m_train_num);
 		
 //		System.out.println(all_tokens.size());
