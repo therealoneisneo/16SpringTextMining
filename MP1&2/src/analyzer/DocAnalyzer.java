@@ -74,12 +74,14 @@ public class DocAnalyzer {
 		m_dfstats = new HashMap<String, Token>();
 		m_tokenizer = new TokenizerME(new TokenizerModel(new FileInputStream(tokenModel)));
 		m_stopwords = new HashSet<String>();
+		m_CtrlVocabulary = new HashSet<String>();
 	}
 	
 	//sample code for loading a list of stopwords from file
 	//you can manually modify the stopword file to include your newly selected words
 	public void LoadStopwords(String filename) {
 		try {
+			m_stopwords.clear();
 			BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(filename), "UTF-8"));
 			String line;
 
@@ -91,7 +93,6 @@ public class DocAnalyzer {
 					m_stopwords.add(line);
 //					System.out.println(line);
 			}
-			
 			reader.close();
 			System.out.format("Loading %d stopwords from %s\n", m_stopwords.size(), filename);
 		} catch(IOException e){
@@ -99,8 +100,89 @@ public class DocAnalyzer {
 		}
 	}
 	
-	public void BuildCtrlVocab()
-	{}
+	
+	public void LoadVocabulary(String filename) {
+		try {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(filename), "UTF-8"));
+			String line;
+
+			while ((line = reader.readLine()) != null) {
+				//it is very important that you perform the same processing operation to the loaded stopwords
+				//otherwise it won't be matched in the text content
+				line = SnowballStemming(Normalization(line));
+				if (!line.isEmpty())
+					m_CtrlVocabulary.add(line);
+//					System.out.println(line);
+			}
+			reader.close();
+			System.out.format("Loading %d controlled vocabulary from %s\n", m_stopwords.size(), filename);
+		} catch(IOException e){
+			System.err.format("[Error]Failed to open file %s!!", filename);
+		}
+	}
+	
+	
+	public static void OutputWordCount(HashMap<String, Token> entrylist, String filename)
+	{
+		try
+		{
+			File writename = new File(filename);
+			writename.createNewFile();
+			BufferedWriter out = new BufferedWriter(new FileWriter(writename));  
+			for (Map.Entry<String, Token> entry : entrylist.entrySet())
+			{
+				out.write(entry.getKey() + "," + entry.getValue().getValue() + "\r\n");
+			}
+			out.flush();
+			out.close(); 
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+	}
+	
+	public static void OutputWordCount(List<Map.Entry<String, Token>> entrylist, String filename)
+	{
+		try
+		{
+			File writename = new File(filename);
+			writename.createNewFile();
+			BufferedWriter out = new BufferedWriter(new FileWriter(writename));  
+			for (Entry<String, Token> entry : entrylist)
+			{
+				out.write(entry.getKey() + "," + entry.getValue().getValue() + "\r\n");
+			}
+			out.flush();
+			out.close(); 
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+	}
+	
+	
+	public static void OutputWordList(HashSet<String> entrylist, String filename)
+	{
+		try
+		{
+			File writename = new File(filename);
+			writename.createNewFile();
+			BufferedWriter out = new BufferedWriter(new FileWriter(writename));  
+			for (String entry : entrylist)
+			{
+				out.write(entry + "\r\n");
+			}
+			out.flush();
+			out.close(); 
+		  
+		} 
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+	}
 	
 	
 	
@@ -122,9 +204,10 @@ public class DocAnalyzer {
 					{
 						tok = Normalization(tok);
 						if (tok.length() == 0){break;}
+						dfcheck.add(tok);
 						if (!m_stopwords.contains(tok))
 						{
-							dfcheck.add(tok);
+							
 							if (m_stats.containsKey(tok))
 							{
 								Token temp = m_stats.get(tok);
@@ -202,6 +285,98 @@ public class DocAnalyzer {
 			e.printStackTrace();
 		}
 	}
+	
+	
+	
+	// reload documents with controlled vocabulary to build vector space
+	public void analyzeDocumentVM(JSONObject json) {		
+		try {
+			JSONArray jarray = json.getJSONArray("Reviews");
+			List<List<Integer>> Vectors = new ArrayList<>();
+			
+			for(int i=0; i<jarray.length(); i++) {
+				Post review = new Post(jarray.getJSONObject(i));
+				String[] tokens = Tokenize(review.getContent());
+				review.setTokens(tokens);
+
+
+				for (int t = 0; t< tokens.length - 1; t++)
+				{
+					String tok1 = Normalization(tokens[t]);
+					String tok2 = Normalization(tokens[t + 1]);
+					
+					if
+					
+					
+					if (!m_stopwords.contains(tok1) && !m_stopwords.contains(tok2) && tok1.length() != 0 && tok2.length() != 0 )
+					{
+						String tok = tok1 + "_" + tok2;
+						if (m_stats.containsKey(tok))
+						{
+							Token temp = m_stats.get(tok);
+							temp.setValue(temp.getValue() + 1); // increase count by 1
+						}
+						else
+						{
+							m_stats.put(tok, new Token(tok));
+						}
+					}
+					
+				}
+				
+				for (String tok : dfcheck)
+				{
+					if (m_dfstats.containsKey(tok))
+					{
+						Token temp = m_stats.get(tok);
+						temp.setValue(temp.getValue() + 1); // increase count by 1
+					}
+					else
+					{
+						m_dfstats.put(tok, new Token(tok));
+					}
+				}
+				
+				m_reviews.add(review);
+				
+
+			}
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	public void createLanguageModel() {
 		m_langModel = new LanguageModel(m_N, m_stats.size());
@@ -292,11 +467,9 @@ public class DocAnalyzer {
 //		
 		
 		token = token.replaceAll("\\p{Punct}+", "");
-//		token = token.replaceAll("[^A-Za-z0-9]", "");
-		
+
 //		remove punctuation
-	
-		
+
 		// convert to lower case
 		token = token.toLowerCase(); 
 		
@@ -307,6 +480,7 @@ public class DocAnalyzer {
 		
 		// add a line to recognize integers and doubles via regular expression
 		// and convert the recognized integers and doubles to a special symbol "NUM"
+//		token = token.replaceAll("[^A-Za-z0-9]", "");
 		token = token.replaceAll("\\W+", "");
 		
 		return token;
@@ -315,23 +489,26 @@ public class DocAnalyzer {
 	String[] Tokenize(String text) {
 		return m_tokenizer.tokenize(text);
 	}
-//	public static void DFCalc(HashMap<String, Token> m_dfstats)
-//	{
-//		
-//	}
-	
-	public static void ZipfsLaw(HashMap<String, Token> m_stats, String Filename)
-	{
 
+
+	public static List<Map.Entry<String, Token>> SortHashMap(HashMap<String, Token> m_stats)
+	{
 		List<Map.Entry<String, Token>> entrylist = new ArrayList<Map.Entry<String, Token>>(m_stats.entrySet());
 
-		
 		Collections.sort(entrylist, new Comparator<Map.Entry<String, Token>>()
 			{public int compare(Map.Entry<String, Token> o1, Map.Entry<String, Token> o2)
 				{
 					return((int)o2.getValue().getValue() - (int)o1.getValue().getValue());
 				}
 			});
+		return entrylist;
+	}
+	
+	public static void ZipfsLaw(HashMap<String, Token> m_stats, String Filename)
+	{
+
+		List<Map.Entry<String, Token>> entrylist = SortHashMap(m_stats);
+//				new ArrayList<Map.Entry<String, Token>>(m_stats.entrySet());
 		FileWriter fw = null;
 		try
 		{
@@ -391,6 +568,31 @@ public class DocAnalyzer {
 		}		
 	}
 	
+	public void BuildCVocabulary(List<Map.Entry<String, Token>> all_df_sorted)
+	{
+		int count = 0;
+		System.out.println("Building CV...");
+		for (Map.Entry<String, Token> entry : all_df_sorted)
+		{
+			if (count < 100)
+			{
+				System.out.println("StopWord add  " + entry.getKey() + entry.getValue().getValue());
+				
+				m_stopwords.add(entry.getKey());
+				count += 1;
+			}
+			double df = entry.getValue().getValue();
+			if (df < 50)
+			{break;}
+			m_CtrlVocabulary.add(entry.getKey());
+		}
+	}
+	
+	
+	
+	
+	
+	
 	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException {		
 		DocAnalyzer analyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
 		DocAnalyzer analyzer2 = new DocAnalyzer("./data/Model/en-token.bin", 2);
@@ -413,11 +615,44 @@ public class DocAnalyzer {
 		all_TFs.putAll(analyzer2.m_stats);
 		all_DFs.putAll(analyzer.m_dfstats);
 		all_DFs.putAll(analyzer2.m_dfstats);
+		
+		
+		
+		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
+		
+		DocAnalyzer.OutputWordCount(all_df_sorted, "allDF.txt"); 
+		
+		analyzer.BuildCVocabulary(all_df_sorted);//Build Controlled vocabulary
+		
+		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "TestCV.txt");
+		DocAnalyzer.OutputWordList(analyzer.m_stopwords, "Final_stop_words.txt");
+		
+		DocAnalyzer SimiAnalyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
+		SimiAnalyzer.LoadVocabulary("TestCV.txt");
+		SimiAnalyzer.LoadDirectory("./Data/yelp/test", ".json");
+		
+		
+		
+		
+		
+		
+		
+		
 //		DocAnalyzer.ZipfsLaw(all_TFs, "tf_result.csv");
 //		DocAnalyzer.ZipfsLaw(all_DFs, "df_result.csv");
-		List<Map.Entry<String, Token>> CVocabulary;
-		CVocabulary = DocAnalyzer.TfIdfCalc(all_DFs, "Controled.csv");
-		System.out.println(analyzer.m_train_num);
+//		List<Map.Entry<String, Token>> CVocabulary;
+//		CVocabulary = DocAnalyzer.TfIdfCalc(all_DFs, "Controled.csv");
+//		HashSet<String> testdf = new HashSet<String>(all_DFs.keySet()); 
+//		DocAnalyzer.OutputWordList(testdf, "Test.txt");
+//		System.out.println("write out complete, loading");
+//		analyzer.LoadVocabulary("Test.txt");
+//		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "Test1.txt");
+//		System.out.println("2nd write out complete");
+		
+		
+		
+		
+//		System.out.println(analyzer.m_train_num);
 		
 //		System.out.println(all_tokens.size());
 
