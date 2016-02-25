@@ -22,6 +22,33 @@ public class Post {
 		m_ID = ID;
 	}
 	
+	double[] TokenVec;// the vector of Tokens count(the word vector), index follows the CtrlVocabulary 
+	
+	public double[] getTVec()
+	{
+		return TokenVec;
+	}
+	
+	public void setTVec(double[] TV)
+	{
+		TokenVec = TV;
+	}
+	
+	public void initTVec(int size)
+	{
+		TokenVec = new double[size];
+	}
+	
+	public void setTvecValue(int index, double value)
+	{
+		TokenVec[index] = value;
+	}
+	
+	public double getTvecValue(int index)
+	{
+		return TokenVec[index];
+	}
+	
 	public String getID() {
 		return m_ID;
 	}
@@ -104,7 +131,30 @@ public class Post {
 	}
 	
 	public double similiarity(Post p) {
-		return 0;//compute the cosine similarity between this post and input p based on their vector space representation
+		double result = 0;
+		double m1 = 0;
+		double m2 = 0;
+		for (int i = 0; i < TokenVec.length; i ++)
+		{
+			result += TokenVec[i] * p.TokenVec[i];
+			m1 += TokenVec[i] * TokenVec[i];
+			m2 += p.TokenVec[i] * p.TokenVec[i];
+		}
+		
+		m1 = Math.sqrt(m1);
+		m2 = Math.sqrt(m2);
+		result /= m1;
+		result /= m2;
+		
+		return result;//compute the cosine similarity between this post and input p based on their vector space representation
+	}
+	
+	public void Output()
+	{
+		System.out.println("m_ID : " + m_ID);
+		System.out.println("m_author : " + m_author);
+		System.out.println("m_date : " + m_date);
+		System.out.println("m_content : " + m_content);
 	}
 	
 	public Post(JSONObject json) {
@@ -116,6 +166,7 @@ public class Post {
 			setContent(json.getString("Content"));
 			setRating(json.getDouble("Overall"));
 			setLocation(json.getString("Author_Location"));			
+//			MostSimi = null;
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
@@ -133,4 +184,8 @@ public class Post {
 		
 		return json;
 	}
+	
+//	
+//	public Post[] MostSimi;
+//	public Double[] SimiValue;
 }
