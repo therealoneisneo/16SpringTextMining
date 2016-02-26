@@ -15,6 +15,7 @@ youd
 chicago
 favorit
 you
+beer
 despit
 happen
 sometim
@@ -41,8 +42,8 @@ whos
 be
 least
 wouldnt
-hot
 pork
+hot
 how
 see
 inward
@@ -132,6 +133,7 @@ sorri
 for
 back
 consequ
+dine
 wasnt
 ive
 end
@@ -180,13 +182,13 @@ ie
 per
 fri
 if
-french
 order
 went
 im
 in
 made
 anyhow
+tapa
 is
 it
 forth
@@ -215,7 +217,6 @@ howbeit
 known
 top
 too
-potato
 have
 share
 presum
@@ -252,10 +253,8 @@ amongst
 that
 whenev
 high
-burger
 etc
 whether
-find
 than
 me
 insofar
@@ -483,7 +482,6 @@ uucp
 love
 tabl
 henc
-portion
 enjoy
 our
 out
@@ -524,6 +522,7 @@ should
 few
 from
 day
+group
 whither
 like
 ill
@@ -578,6 +577,7 @@ differ
 somewher
 meal
 unlik
+oyster
 third
 dessert
 mean

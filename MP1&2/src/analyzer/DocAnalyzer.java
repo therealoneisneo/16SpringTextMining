@@ -123,7 +123,7 @@ public class DocAnalyzer {
 			}
 			reader.close();
 			
-//			System.out.format("Loading %d controlled vocabulary from %s\n", m_CtrlVocabulary.size(), filename);
+			System.out.format("Loading %d DF from %s\n", DFs.size(), filename);
 		} catch(IOException e){
 			System.err.format("[Error]Failed to open file %s!!", filename);
 		}
@@ -396,11 +396,11 @@ public class DocAnalyzer {
 		
 		List<String> CtrlVoc = new ArrayList<String>(m_CtrlVocabulary);
 		int CtrlSize = CtrlVoc.size();
-//		int count = 0;
+		int count = 0;
 		for(Post review : reviewentry)
 		{
-//			System.out.println(count);
-//			count += 1;
+			System.out.println(count);
+			count += 1;
 			String[] tokens = Tokenize(review.getContent());
 			review.setTokens(tokens);
 			review.initTVec(CtrlSize);
@@ -687,8 +687,11 @@ public class DocAnalyzer {
 	
 	public void CalcSimi()//Calculate the similarity between query and test
 	{
+		int count = 0;
 		for(Post query : m_Qreviews)
 		{
+			count += 1;
+			System.out.println(count);
 			Post[] m = new Post[3];
 			double[] sims = {0,0,0};
 
@@ -736,45 +739,46 @@ public class DocAnalyzer {
 	
 	
 	
-	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException {		
-		DocAnalyzer analyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
-		DocAnalyzer analyzer2 = new DocAnalyzer("./data/Model/en-token.bin", 2);
+	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException {	
 		
+//		DocAnalyzer analyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
+//		DocAnalyzer analyzer2 = new DocAnalyzer("./data/Model/en-token.bin", 2);
+
 		//code for demonstrating tokenization and stemming
 //		analyzer.TokenizerDemon("I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
 		// analyzer.TokenizerDemon("this is just a test sentence for the function");
 			
 		//entry point to deal with a collection of documents
-		analyzer.LoadStopwords("init_stop_words.txt");
-		analyzer.LoadDirectory("./Data/yelp/train", ".json");
+//		HashMap<String, Token> all_TFs, all_DFs;
+//		all_TFs = new HashMap<String, Token>();
+//		all_DFs = new HashMap<String, Token>();
+//		analyzer.LoadStopwords("init_stop_words.txt");
+//		analyzer2.LoadStopwords("init_stop_words.txt");
+//		analyzer.LoadDirectory("./Data/yelp/train", ".json");
+//		analyzer2.LoadDirectory("./Data/yelp/train", ".json");
+//		
+//		all_DFs.putAll(analyzer.m_dfstats);
+//		all_DFs.putAll(analyzer2.m_dfstats);
+//		
+//		
 //		analyzer.LoadDirectory("./Data/yelp/test", ".json");
-		
-		analyzer2.LoadStopwords("init_stop_words.txt");
-		analyzer2.LoadDirectory("./Data/yelp/train", ".json");
 //		analyzer2.LoadDirectory("./Data/yelp/test", ".json");
+//
+//		all_TFs.putAll(analyzer.m_stats);
+//		all_TFs.putAll(analyzer2.m_stats);
 //		
-		HashMap<String, Token> all_TFs, all_DFs;
-		all_TFs = new HashMap<String, Token>();
-		all_DFs = new HashMap<String, Token>();
-		all_TFs.putAll(analyzer.m_stats);
-		all_TFs.putAll(analyzer2.m_stats);
-		all_DFs.putAll(analyzer.m_dfstats);
-		all_DFs.putAll(analyzer2.m_dfstats);
+//		
+//		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
+//		DocAnalyzer.OutputWordCount(all_tf_sorted, "alltf.txt");
+//		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
+//		DocAnalyzer.OutputWordCount(all_df_sorted, "N_allDF.txt"); 
+//		analyzer.BuildCVocabulary(all_df_sorted);//Build Controlled vocabulary
+//		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "N_CtrlVocabulary.txt");
+//		DocAnalyzer.OutputWordList(analyzer.m_stopwords, "Final_stop_words.txt");
 		
-		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
-		DocAnalyzer.OutputWordCount(all_tf_sorted, "alltf.txt");
-		
-		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
-////		
-		DocAnalyzer.OutputWordCount(all_df_sorted, "N_allDF.txt"); 
-////		
-		analyzer.BuildCVocabulary(all_df_sorted);//Build Controlled vocabulary
-////		
-		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "N_CtrlVocabulary.txt");
-		DocAnalyzer.OutputWordList(analyzer.m_stopwords, "Final_stop_words.txt");
-		
+		//***************************************************
+		// Above are the preprocessing
 		DocAnalyzer SimiAnalyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
-//		
 		SimiAnalyzer.LoadVocabulary("N_CtrlVocabulary.txt");
 		SimiAnalyzer.LoadDirectory("./Data/yelp/test", ".json");
 		SimiAnalyzer.LoadQurey("./Data/samples/query.json");
