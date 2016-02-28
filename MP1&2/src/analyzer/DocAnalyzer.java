@@ -447,14 +447,60 @@ public class DocAnalyzer {
 	
 	
 	public void createLanguageModel() {
-		m_langModel = new LanguageModel(m_N, m_stats.size());
-		
-		for(Post review:m_reviews) {
+		m_langModel = new LanguageModel(m_N, m_CtrlVocabulary.size());
+		for(Post review : m_reviews) {
 			String[] tokens = Tokenize(review.getContent());
+			review.setTokens(tokens);
+
+			if (m_N == 1) // unigram model, calculate all terms' count within CtrlVocabulary
+			{
+
+				for (String tok : tokens)
+				{
+					tok = SnowballStemming(Normalization(tok));
+					if (m_CtrlVocabulary.contains(tok))
+					{
+						m_totalcount += 1; // only count the word withing m_CtrlVocabulary
+						if (m_model.containsKey(tok))
+						{
+							Token temp = m_model.get(tok);
+							temp.setValue(temp.getValue() + 1); // increase count by 1
+						}
+						else
+						{
+							Token newt = new Token(m_model.size(), tok);
+							newt.setValue(1); 
+							m_model.put(tok, newt);
+						}
+					}
+					
+				}
+				// // compute the actual prob of each word
+				// for (String tok : tokens)
+				// {
+				// 	tok = SnowballStemming(Normalization(tok));
+				// 	if (m_CtrlVocabulary.contains(tok))
+				// 	{
+				// 		m_model.get(tok).setValue(calcMLProb(String tok))
+				// 	}
+				// }
+			}
+
+			//if (n_N == 2)// the bigram model
+
+				
+
+
+
+
+
+
+
 			/**
 			 * HINT: essentially you will perform very similar operations as what you have done in analyzeDocument() 
 			 * Now you should properly update the counts in LanguageModel structure such that we can perform maximum likelihood estimation on it
 			 */
+
 		}
 	}
 	

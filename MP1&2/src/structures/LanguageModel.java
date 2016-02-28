@@ -18,15 +18,23 @@ public class LanguageModel {
 	
 	double m_lambda; // parameter for linear interpolation smoothing
 	double m_delta; // parameter for absolute discount smoothing
+	double m_totalcount;// parameter to count the total occurence of CtrlVocab in this corpus.
+	
+	
+	
 	
 	public LanguageModel(int N, int V) {
 		m_N = N;
+		m_V = V;
+		m_totalcount = 0;
 		m_model = new HashMap<String, Token>();
+		m_lambda = 0.9;
+		m_delta = 0.1;
 	}
 	
 	public double calcMLProb(String token) {
 		// return m_model.get(token).getValue(); // should be something like this
-		return 0;
+		return m_model.get(token).getValue() / m_totalcount;
 	}
 
 	public double calcLinearSmoothedProb(String token) {
