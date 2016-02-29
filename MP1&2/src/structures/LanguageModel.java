@@ -19,7 +19,7 @@ public class LanguageModel {
 	double m_lambda; // parameter for linear interpolation smoothing
 	double m_delta; // parameter for absolute discount smoothing
 	double m_totalcount;// parameter to count the total word count in this corpus.
-	
+	Set<String> m_uniSet;// the set holds all unigram keys for the bigram generation purpose.
 	
 	
 	
@@ -33,34 +33,55 @@ public class LanguageModel {
 		m_delta = 0.1;
 	}
 	
+	
+	public void setUniKeySet(Set<String> uni)
+	{
+		m_uniSet = uni;
+	}
+//	public void testbigrams()
+//	{
+//		for (Map.Entry<String, Token> entry : m_model.entrySet())
+//		{
+//			String[] tokStr = entry.getKey().split("_");
+//			if (tokStr[0].equals("good"))
+//			{
+//				System.out.println(entry.getValue().m_token);
+//				System.out.println(entry.getValue().m_value);
+//			}
+//		}
+//	}
+//	
 	public void bigramTokenProcess()
 	{
+		int countgood = 0;
 		for (Map.Entry<String, Token> entry : m_model.entrySet())
 		{
-//			Token tok = entry.getValue();
+			if (entry.getKey().equals("good_meal"))
+				countgood += 1;
 			String[] tokStr = entry.getKey().split("_");
 			
+				
 			
 			if (m_bigrams.containsKey(tokStr[0]))
 			{
 				HashMap<String, Double> temp = m_bigrams.get(tokStr[0]);
-				if (temp.containsKey(tokStr[1]))
-				{
-					double count = temp.get(tokStr[1]);
-					temp.put(tokStr[1], count + 1);
-				}
-				else
-					temp.put(tokStr[1], 1.0);
+				temp.put(tokStr[1], entry.getValue().getValue());
 			}
 			else
 			{	
 				HashMap<String, Double> temp = new HashMap<String, Double>();
-				temp.put(tokStr[1], 1.0);
+				temp.put(tokStr[1], entry.getValue().getValue());
 				m_bigrams.put(tokStr[0], temp);
 			}
 		}
+		System.out.println("good :" + countgood);
 	}
 
+	public HashMap<String, Token> getModel()
+	{
+		return m_model;
+	}
+	
 	public void increCount()// increase the word count of m_totalcount
 	{
 		m_totalcount += 1;
@@ -126,7 +147,7 @@ public class LanguageModel {
 		{
 			double prob = 0.0;
 			String combo = preTok + "_" + tok;
-			if (smtype == "lin")
+			if (smtype.equals("lin"))
 			{
 				prob = calcLinearSmoothedProb(combo);
 			}
@@ -155,7 +176,13 @@ public class LanguageModel {
 				{
 					count += entry.getValue();
 				}
-				return temp.get(toks[1]) / count;
+				if (temp.containsKey(toks[1]))
+				{
+					return temp.get(toks[1]) / count;
+				}
+				else
+					return 0;
+				
 			}
 			else
 				return 0;
@@ -182,7 +209,10 @@ public class LanguageModel {
 			{
 				count += entry.getValue();
 			}
-			return Math.max(temp.get(toks[1]) - m_delta, 0) / count;
+			if (temp.containsKey(toks[1]))
+				return Math.max(temp.get(toks[1]) - m_delta, 0) / count;
+			else
+				return 0;
 		}
 		else
 			return 0;
@@ -217,13 +247,92 @@ public class LanguageModel {
 		// please use additive smoothing to smooth a unigram language model
 	}
 	
+	
+	public String genSentance(int len, int ngram, String SmType)
+	{
+		String result = "";
+		if (ngram == 1)
+		{
+			result = sampling(SmType);
+			for (int i = 0; i < len - 1; i++)
+			{
+				result += " " + sampling(SmType);
+			}
+			result += ".";
+			
+		}
+		else
+		{
+			result = m_reference.sampling(SmType);
+			String preTok = result;
+			for (int i = 0; i < len - 1; i++)
+			{
+				String temptest = sampling(SmType, preTok);
+				String[] toks = temptest.split("_");
+				System.out.println(toks);
+				preTok = toks[1];
+				result += " " + preTok;
+			}
+			result += ".";
+		}
+		result = result.substring(0, 1).toUpperCase() + result.substring(1);
+		return result;
+	}
+	
+	public void testProbSum()
+	{
+		for (String preTok : m_uniSet)
+		{
+			double testsum1 = 0.0;
+			double testsum2 = 0.0;
+			for(String postTok : m_uniSet)
+			{
+				String tok = preTok + "_" + postTok;
+				testsum1 += calcLinearSmoothedProb(tok);
+				testsum2 += calcAbsSmoothedProb(tok);
+			}
+			
+			int a = 0;
+		}
+		
+	}
+	
 	//We have provided you a simple implementation based on unigram language model, please extend it to bigram (i.e., controlled by m_N)
-	public String sampling() {
+	public String sampling(String SmType, String preTok) 
+	{
 		double prob = Math.random(); // prepare to perform uniform sampling
-		for(String token:m_model.keySet()) {
-			prob -= calcLinearSmoothedProb(token);
-			if (prob<=0)
-				return token;
+
+		while (prob > 0)
+		{
+			for(String postTok : m_uniSet)
+			{
+				String tok = preTok + "_" + postTok;
+				if(SmType.equals("lin"))
+					prob -= calcLinearSmoothedProb(tok);
+				else
+					prob -= calcAbsSmoothedProb(tok);
+				
+				if (prob<=0)
+					return tok;
+			}
+		}
+		
+
+		return null; //How to deal with this special case?
+	}
+	
+	public String sampling(String SmType) // mainly for unigram sampling
+	{
+		double prob = Math.random(); // prepare to perform uniform sampling
+		if (m_N == 1)
+		{
+			for(String token:m_model.keySet()) 
+			{
+				prob -= calcLinearSmoothedProb(token);
+				if (prob<=0)
+					return token;
+			}
+
 		}
 		return null; //How to deal with this special case?
 	}

@@ -263,6 +263,27 @@ public class DocAnalyzer {
 		}
 	}
 	
+	public static void OutputWordList(List<String> entrylist, String filename)
+	{
+		try
+		{
+			File writename = new File(filename);
+			writename.createNewFile();
+			BufferedWriter out = new BufferedWriter(new FileWriter(writename));  
+			for (String entry : entrylist)
+			{
+				out.write(entry + "\r\n");
+			}
+			out.flush();
+			out.close(); 
+		  
+		} 
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+	}
+	
 	public void LoadLMDocument(JSONObject json) 
 	{		
 		try {
@@ -473,7 +494,7 @@ public class DocAnalyzer {
 
 	public void createLanguageModel() {
 		m_langModel = new LanguageModel(m_N);
-		
+		int count = 0;
 		if (m_N == 1)// unigram model, calculate all terms
 		{
 			for(Post review : m_reviews) 
@@ -510,13 +531,17 @@ public class DocAnalyzer {
 						String tok2 = SnowballStemming(Normalization(tokens[i + 1]));
 						if (tok1.length() > 0 && tok2.length() > 0)
 						{
+							if (tok1.equals("good"))
+								count += 1;
 							String tok = tok1 + "_" + tok2;
 							m_langModel.increCount(); 
 							m_langModel.addToken(tok); // add token to the m_model	
 						}
 					}
 				}
+				System.out.println("bigram starts with good number: " + count);
 				m_langModel.bigramTokenProcess();
+//				m_langModel.testbigrams();
 			}
 		}
 	}
@@ -772,7 +797,8 @@ public class DocAnalyzer {
 	
 	
 	
-	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException {	
+	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException 
+	{	
 		
 		
 		
@@ -836,27 +862,53 @@ public class DocAnalyzer {
 //		SimiAnalyzer.CalcSimi();
 //		//*******************************************************
 		// MP2 starts here
-		analyzer.LoadLMDir("./Data/yelp/train", ".json");
-		System.out.println("1");
+		analyzer.LoadLMDir("./data/yelp/train", ".json");
 		analyzer.createLanguageModel();
-		System.out.println("2");
-		analyzer2.LoadLMDir("./Data/yelp/train", ".json");
-		System.out.println("3");
+		System.out.println("build unigram model complete...");
+		analyzer2.LoadLMDir("./data/yelp/train", ".json");
 		analyzer2.createLanguageModel();
-		System.out.println("4");
-//		analyzer2.m_langModel.setRefModel(analyzer.m_langModel);
+		System.out.println("build bigram model complete...");
+		
 		LanguageModel unigram = analyzer.m_langModel;
 		LanguageModel bigram = analyzer2.m_langModel;
 		bigram.setRefModel(unigram);
+		bigram.setUniKeySet(unigram.getModel().keySet());
+//		HashMap<String, Token> unimodel = analyzer.m_langModel.getModel();
 		List<Map.Entry<String, Double>> q1 = bigram.ProbQuery("good", "lin");
 		List<Map.Entry<String, Double>> q2 = bigram.ProbQuery("good", "abs");
-		for (int i = 0; i < 100; i++)
+		for (int i = 0; i < 10; i++)
 		{
 			System.out.println(q1.get(i).getKey() + " : " + q1.get(i).getValue());
 			System.out.println(q2.get(i).getKey() + " : " + q2.get(i).getValue());
 			System.out.println("-------------------");
 		}
-		// 
+		
+
+		List<String> uniSen, biSenLin, biSenAbs;
+		uniSen = new ArrayList<String>();
+		biSenLin = new ArrayList<String>();
+		biSenAbs = new ArrayList<String>();
+		for (int i = 0; i < 10; i++)
+		{
+			String temp;
+			System.out.println("Generating the " + i + "th sentence...");
+			
+			temp = unigram.genSentance(15, 1, "lin");
+			System.out.print(temp);
+			uniSen.add(temp);
+//			
+			temp = bigram.genSentance(15, 2, "lin");
+			System.out.print(temp);
+			biSenLin.add(temp);
+			
+			temp = bigram.genSentance(15, 2, "abs");
+			System.out.print(temp);
+			biSenAbs.add(temp);
+		}
+		
+		OutputWordList(uniSen, "uniSentence.txt");
+		OutputWordList(biSenLin, "biSentenceLin.txt");
+		OutputWordList(biSenAbs, "biSentenceAbs.txt");
 		System.out.println("complete");
 	}
 
