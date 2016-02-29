@@ -263,7 +263,18 @@ public class DocAnalyzer {
 		}
 	}
 	
-	
+	public void LoadLMDocument(JSONObject json) 
+	{		
+		try {
+			JSONArray jarray = json.getJSONArray("Reviews");
+			for(int i=0; i<jarray.length(); i++) {
+				Post review = new Post(jarray.getJSONObject(i));
+				m_reviews.add(review);
+			}
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+	}
 	
 	public void analyzeDocument(JSONObject json) {		
 		try {
@@ -434,75 +445,85 @@ public class DocAnalyzer {
 		}
 	}
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	public void createLanguageModel() {
-		m_langModel = new LanguageModel(m_N, m_CtrlVocabulary.size());
-		for(Post review : m_reviews) {
-			String[] tokens = Tokenize(review.getContent());
-			review.setTokens(tokens);
 
-			if (m_N == 1) // unigram model, calculate all terms' count within CtrlVocabulary
+	public void LoadLMDir(String folder, String suffix) 
+	{
+		File dir = new File(folder);
+		int size = m_reviews.size();
+		for (File f : dir.listFiles()) {
+			if (f.isFile() && f.getName().endsWith(suffix))
 			{
+				LoadLMDocument(LoadJson(f.getAbsolutePath()));
+//				System.out.println(m_stats.size());
+			}
+			else if (f.isDirectory())
+				LoadLMDir(f.getAbsolutePath(), suffix);
+		}
+		size = m_reviews.size() - size;
+		if (m_train_num < 0)
+		{
+			m_train_num = size;
+		}
+		else if (m_test_num < 0)
+		{
+			m_test_num = size;
+		}
+		System.out.println("Loading " + size + " review documents from " + folder);
+	}
 
+	public void createLanguageModel() {
+		m_langModel = new LanguageModel(m_N);
+		
+		if (m_N == 1)// unigram model, calculate all terms
+		{
+			for(Post review : m_reviews) 
+			{
+				String[] tokens = Tokenize(review.getContent());
+				review.setTokens(tokens);
 				for (String tok : tokens)
 				{
 					tok = SnowballStemming(Normalization(tok));
-					if (m_CtrlVocabulary.contains(tok))
+					if (tok.length() > 0)
 					{
-						m_totalcount += 1; // only count the word withing m_CtrlVocabulary
-						if (m_model.containsKey(tok))
+						m_langModel.increCount(); 
+						m_langModel.addToken(tok); // add token to the m_model
+					}	
+				}
+				/**
+				 * HINT: essentially you will perform very similar operations as what you have done in analyzeDocument() 
+				 * Now you should properly update the counts in LanguageModel structure such that we can perform maximum likelihood estimation on it
+				 */
+			}
+		}
+		
+		else//bigram model
+		{
+			if (m_N == 2)// the bigram model
+			{
+				for(Post review : m_reviews) 
+				{
+					String[] tokens = Tokenize(review.getContent());
+					review.setTokens(tokens);
+					for (int i = 0; i < tokens.length - 1; i++)
+					{
+						String tok1 = SnowballStemming(Normalization(tokens[i]));
+						String tok2 = SnowballStemming(Normalization(tokens[i + 1]));
+						if (tok1.length() > 0 && tok2.length() > 0)
 						{
-							Token temp = m_model.get(tok);
-							temp.setValue(temp.getValue() + 1); // increase count by 1
-						}
-						else
-						{
-							Token newt = new Token(m_model.size(), tok);
-							newt.setValue(1); 
-							m_model.put(tok, newt);
+							String tok = tok1 + "_" + tok2;
+							m_langModel.increCount(); 
+							m_langModel.addToken(tok); // add token to the m_model	
 						}
 					}
-					
 				}
-				// // compute the actual prob of each word
-				// for (String tok : tokens)
-				// {
-				// 	tok = SnowballStemming(Normalization(tok));
-				// 	if (m_CtrlVocabulary.contains(tok))
-				// 	{
-				// 		m_model.get(tok).setValue(calcMLProb(String tok))
-				// 	}
-				// }
+				m_langModel.bigramTokenProcess();
 			}
-
-			//if (n_N == 2)// the bigram model
-
-				
-
-
-
-
-
-
-
-			/**
-			 * HINT: essentially you will perform very similar operations as what you have done in analyzeDocument() 
-			 * Now you should properly update the counts in LanguageModel structure such that we can perform maximum likelihood estimation on it
-			 */
-
 		}
 	}
+	
+	
+	
+	
 	
 	//sample code for loading a json file
 	public JSONObject LoadJson(String filename) {
@@ -639,40 +660,6 @@ public class DocAnalyzer {
 			 fw.close(); 
 		} catch (IOException e){e.printStackTrace();}
 	}
-	
-//	public static List<Map.Entry<String, Token>> TfIdfCalc(HashMap<String, Token> m_dfstats, String Filename)// calc the tfidf of the token in the vocabulary 
-//	{
-//
-//		List<Map.Entry<String, Token>> entrylist = new ArrayList<Map.Entry<String, Token>>(m_dfstats.entrySet());
-//		List<Map.Entry<String, Token>> ControlV = new ArrayList<Map.Entry<String, Token>>();//the List to store all controlled vocabulary
-//		
-//		Collections.sort(entrylist, new Comparator<Map.Entry<String, Token>>()
-//			{public int compare(Map.Entry<String, Token> o1, Map.Entry<String, Token> o2)
-//				{
-//					return((int)o2.getValue().getValue() - (int)o1.getValue().getValue());
-//				}
-//			});
-//		FileWriter fw = null;
-//		try
-//		{
-//			fw = new FileWriter(Filename);
-//			String title = "Key,Value\r\n";
-//			fw.write(title);
-//			int cut = 0;
-//			for (Entry<String, Token> entry : entrylist)
-//			{
-//				cut = cut + 1;
-//				if (cut < 100)
-//					continue;
-//				if (entry.getValue().getValue() < 50)
-//					break;
-//				ControlV.add(entry);
-//				System.out.println(entry.getKey() + "\t" + entry.getValue().getValue());
-//				fw.write(entry.getKey() + "," + entry.getValue().getValue()+ "\r\n"); 
-//			}
-//			 fw.close(); 
-//		} catch (IOException e){e.printStackTrace();}
-//		return ControlV;
 //	}
 	
 	public void TokenizerDemon(String text) {
@@ -787,8 +774,10 @@ public class DocAnalyzer {
 	
 	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException {	
 		
-//		DocAnalyzer analyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
-//		DocAnalyzer analyzer2 = new DocAnalyzer("./data/Model/en-token.bin", 2);
+		
+		
+		DocAnalyzer analyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
+		DocAnalyzer analyzer2 = new DocAnalyzer("./data/Model/en-token.bin", 2);
 
 		//code for demonstrating tokenization and stemming
 //		analyzer.TokenizerDemon("I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
@@ -824,29 +813,50 @@ public class DocAnalyzer {
 		
 		//***************************************************
 		// Above are the preprocessing
-		DocAnalyzer SimiAnalyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
-		SimiAnalyzer.LoadVocabulary("N_CtrlVocabulary.txt");
-		SimiAnalyzer.LoadDirectory("./Data/yelp/test", ".json");
-		SimiAnalyzer.LoadQurey("./Data/samples/query.json");
-
-		HashMap<String, Double> DFs = SimiAnalyzer.LoadDFs("N_allDF.txt");
-//		HashMap<String, Double> TFs = SimiAnalyzer.LoadTFs("alltf.txt");
-		SimiAnalyzer.analyzeDocumentVM(SimiAnalyzer.m_reviews);
-		SimiAnalyzer.analyzeDocumentVM(SimiAnalyzer.m_Qreviews);
-		int size = SimiAnalyzer.m_reviews.size();
-		for (int i = 0; i < size; i++)
+//		DocAnalyzer SimiAnalyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
+//		SimiAnalyzer.LoadVocabulary("N_CtrlVocabulary.txt");
+//		SimiAnalyzer.LoadDirectory("./Data/yelp/test", ".json");
+//		SimiAnalyzer.LoadQurey("./Data/samples/query.json");
+//
+//		HashMap<String, Double> DFs = SimiAnalyzer.LoadDFs("N_allDF.txt");
+////		HashMap<String, Double> TFs = SimiAnalyzer.LoadTFs("alltf.txt");
+//		SimiAnalyzer.analyzeDocumentVM(SimiAnalyzer.m_reviews);
+//		SimiAnalyzer.analyzeDocumentVM(SimiAnalyzer.m_Qreviews);
+//		int size = SimiAnalyzer.m_reviews.size();
+//		for (int i = 0; i < size; i++)
+//		{
+//			SimiAnalyzer.TF_IDFCalc(SimiAnalyzer.m_reviews.get(i), DFs, 38688);
+//		}
+//		size = SimiAnalyzer.m_Qreviews.size();
+//		for (int i = 0; i < size; i++)
+//		{
+//			SimiAnalyzer.TF_IDFCalc(SimiAnalyzer.m_Qreviews.get(i), DFs, 38688);
+//		}
+//		
+//		SimiAnalyzer.CalcSimi();
+//		//*******************************************************
+		// MP2 starts here
+		analyzer.LoadLMDir("./Data/yelp/train", ".json");
+		System.out.println("1");
+		analyzer.createLanguageModel();
+		System.out.println("2");
+		analyzer2.LoadLMDir("./Data/yelp/train", ".json");
+		System.out.println("3");
+		analyzer2.createLanguageModel();
+		System.out.println("4");
+//		analyzer2.m_langModel.setRefModel(analyzer.m_langModel);
+		LanguageModel unigram = analyzer.m_langModel;
+		LanguageModel bigram = analyzer2.m_langModel;
+		bigram.setRefModel(unigram);
+		List<Map.Entry<String, Double>> q1 = bigram.ProbQuery("good", "lin");
+		List<Map.Entry<String, Double>> q2 = bigram.ProbQuery("good", "abs");
+		for (int i = 0; i < 100; i++)
 		{
-			SimiAnalyzer.TF_IDFCalc(SimiAnalyzer.m_reviews.get(i), DFs, 38688);
+			System.out.println(q1.get(i).getKey() + " : " + q1.get(i).getValue());
+			System.out.println(q2.get(i).getKey() + " : " + q2.get(i).getValue());
+			System.out.println("-------------------");
 		}
-		size = SimiAnalyzer.m_Qreviews.size();
-		for (int i = 0; i < size; i++)
-		{
-			SimiAnalyzer.TF_IDFCalc(SimiAnalyzer.m_Qreviews.get(i), DFs, 38688);
-		}
-		
-		SimiAnalyzer.CalcSimi();
-		
-		
+		// 
 		System.out.println("complete");
 	}
 
