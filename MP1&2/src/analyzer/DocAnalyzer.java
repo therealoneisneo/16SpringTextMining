@@ -491,10 +491,73 @@ public class DocAnalyzer {
 		}
 		System.out.println("Loading " + size + " review documents from " + folder);
 	}
-
+	
+	public double PPcalc(LanguageModel langModel, String SmType)//calculate the perplexity of 
+	{
+		double valueAll = 0;
+		double countAll = 0;
+		if (langModel.getGramNum() == 1)// unigram
+		{
+			for(Post review : m_reviews) 
+			{
+				countAll += 1;
+				double value = 0;
+				double count = 0;
+				String[] tokens = Tokenize(review.getContent());
+//				review.setTokens(tokens);
+				for (String tok : tokens)
+				{
+					tok = SnowballStemming(Normalization(tok));
+					if (tok.length() > 0)
+					{
+						count += 1;
+						value += Math.log10(langModel.calcLinearSmoothedProb(tok));
+					}
+				}
+				if (count != 0)
+					valueAll += -1 * value / count;
+			}
+		}
+		else//bigram
+		{
+			int testcount = 0;
+			for(Post review : m_reviews) 
+			{
+				testcount += 1;
+				countAll += 1;
+				double value = 0;
+				double count = 0;
+				String[] tokens = Tokenize(review.getContent());
+//				review.setTokens(tokens);
+				for (int i = 0; i < tokens.length - 1; i++)
+				{
+					String tok1 = SnowballStemming(Normalization(tokens[i]));
+					String tok2 = SnowballStemming(Normalization(tokens[i + 1]));
+					if (tok1.length() > 0 && tok2.length() > 0)
+					{
+						String tok = tok1 + "_" + tok2;
+						count += 1;
+						if (SmType.equals("lin"))
+							value += Math.log10(langModel.calcLinearSmoothedProb(tok));
+						else
+							value += Math.log10(langModel.calcAbsSmoothedProb(tok));
+					}
+				}
+				if(count != 0)
+					valueAll += -1 * value / count;
+				
+			}
+		}
+		return valueAll / countAll;
+	}
+	
+	public void clearReview()// clear all the review in an analyzer
+	{
+		m_reviews.clear();
+	}
 	public void createLanguageModel() {
 		m_langModel = new LanguageModel(m_N);
-		int count = 0;
+//		int count = 0;
 		if (m_N == 1)// unigram model, calculate all terms
 		{
 			for(Post review : m_reviews) 
@@ -531,15 +594,15 @@ public class DocAnalyzer {
 						String tok2 = SnowballStemming(Normalization(tokens[i + 1]));
 						if (tok1.length() > 0 && tok2.length() > 0)
 						{
-							if (tok1.equals("good"))
-								count += 1;
+//							if (tok1.equals("good"))
+//								count += 1;
 							String tok = tok1 + "_" + tok2;
 							m_langModel.increCount(); 
 							m_langModel.addToken(tok); // add token to the m_model	
 						}
 					}
 				}
-				System.out.println("bigram starts with good number: " + count);
+//				System.out.println("bigram starts with good number: " + count);
 				m_langModel.bigramTokenProcess();
 //				m_langModel.testbigrams();
 			}
@@ -873,6 +936,7 @@ public class DocAnalyzer {
 		LanguageModel bigram = analyzer2.m_langModel;
 		bigram.setRefModel(unigram);
 		bigram.setUniKeySet(unigram.getModel().keySet());
+		
 //		HashMap<String, Token> unimodel = analyzer.m_langModel.getModel();
 		List<Map.Entry<String, Double>> q1 = bigram.ProbQuery("good", "lin");
 		List<Map.Entry<String, Double>> q2 = bigram.ProbQuery("good", "abs");
@@ -896,7 +960,7 @@ public class DocAnalyzer {
 			temp = unigram.genSentance(15, 1, "lin");
 			System.out.print(temp);
 			uniSen.add(temp);
-//			
+			
 			temp = bigram.genSentance(15, 2, "lin");
 			System.out.print(temp);
 			biSenLin.add(temp);
@@ -909,7 +973,20 @@ public class DocAnalyzer {
 		OutputWordList(uniSen, "uniSentence.txt");
 		OutputWordList(biSenLin, "biSentenceLin.txt");
 		OutputWordList(biSenAbs, "biSentenceAbs.txt");
-		System.out.println("complete");
+		
+		
+		analyzer.clearReview();
+		analyzer.LoadLMDir("./data/yelp/test", ".json");
+		System.out.println("reviews in test set loaded.");
+		double pp1, pp2, pp3;
+		pp1 = analyzer.PPcalc(unigram, "lin");
+		System.out.println("pp1 : " + pp1);
+		pp2 = analyzer.PPcalc(bigram, "lin");
+		System.out.println("pp2 : " + pp2);
+		pp3 = analyzer.PPcalc(bigram, "abs");
+		System.out.println("pp3 : " + pp3);
+		
+		System.out.println("complete.");
 	}
 
 }
