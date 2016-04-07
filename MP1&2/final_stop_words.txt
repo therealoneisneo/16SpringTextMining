@@ -1,6 +1,4 @@
-awesom
 been
-bad
 hasnt
 your
 without
@@ -10,12 +8,11 @@ these
 describ
 bar
 would
+rabbit
 near
 youd
-chicago
 favorit
 you
-beer
 despit
 happen
 sometim
@@ -23,6 +20,8 @@ sure
 serv
 thus
 viz
+raw
+orlean
 especi
 am
 an
@@ -37,13 +36,16 @@ aw
 much
 wine
 besid
+boston
 isnt
 whos
 be
 least
+roll
 wouldnt
-pork
+cochon
 hot
+pork
 how
 see
 inward
@@ -52,7 +54,7 @@ by
 inde
 whom
 after
-ca
+seafood
 a
 b
 c
@@ -95,7 +97,6 @@ somewhat
 z
 goe
 under
-sweet
 did
 novel
 nine
@@ -115,7 +116,9 @@ wherea
 need
 often
 whereaft
+list
 els
+neptun
 onto
 respect
 et
@@ -133,14 +136,11 @@ sorri
 for
 back
 consequ
-dine
 wasnt
 ive
 end
 hard
 just
-live
-sit
 asid
 over
 otherwis
@@ -150,7 +150,6 @@ go
 anyth
 howev
 kept
-chees
 dinner
 better
 special
@@ -163,10 +162,9 @@ relat
 fresh
 he
 hi
-big
 lunch
+select
 shouldnt
-crowd
 therein
 ignor
 elsewher
@@ -188,7 +186,6 @@ im
 in
 made
 anyhow
-tapa
 is
 it
 forth
@@ -202,7 +199,6 @@ doe
 hello
 somebodi
 anyon
-server
 other
 wait
 valu
@@ -218,7 +214,6 @@ known
 top
 too
 have
-share
 presum
 ourselv
 avail
@@ -243,7 +238,6 @@ ll
 almost
 use
 pleas
-feel
 main
 upon
 while
@@ -259,6 +253,7 @@ than
 me
 insofar
 regardless
+entre
 all
 new
 took
@@ -280,9 +275,7 @@ tast
 therefor
 behind
 no
-chicken
 nt
-busi
 best
 weve
 around
@@ -308,11 +301,11 @@ accord
 pretti
 mere
 until
+walk
 reason
 salad
 gotten
 about
-tasti
 wherein
 concern
 necessari
@@ -350,7 +343,6 @@ sup
 worth
 into
 current
-atmospher
 thereaft
 are
 unless
@@ -367,6 +359,7 @@ star
 onc
 one
 thorough
+call
 appear
 such
 theyll
@@ -375,6 +368,7 @@ nowher
 ask
 quit
 to
+clam
 mani
 thing
 ts
@@ -407,11 +401,13 @@ usual
 might
 hereaft
 this
+lobster
 wont
 dure
 look
 ve
 flavor
+warm
 name
 know
 vs
@@ -422,6 +418,7 @@ que
 delici
 away
 becaus
+cold
 non
 everi
 we
@@ -429,7 +426,6 @@ peopl
 nor
 outsid
 not
-pizza
 whenc
 now
 throughout
@@ -458,18 +454,21 @@ none
 beyond
 three
 when
+put
 her
 whoever
 far
-price
 review
+price
 hes
+appet
 between
 okay
 give
 still
 come
 nobodi
+chowder
 itself
 toward
 consid
@@ -482,6 +481,7 @@ uucp
 love
 tabl
 henc
+north
 enjoy
 our
 out
@@ -496,6 +496,7 @@ eat
 place
 someon
 more
+cook
 alon
 NUM
 selv
@@ -522,7 +523,6 @@ should
 few
 from
 day
-group
 whither
 like
 ill
@@ -547,7 +547,6 @@ appreci
 here
 aint
 noth
-line
 their
 becom
 everyon
@@ -562,6 +561,7 @@ ltd
 provid
 realli
 inc
+butter
 will
 cmon
 overal
@@ -579,9 +579,9 @@ meal
 unlik
 oyster
 third
-dessert
 mean
 various
+allig
 neither
 meat
 latter

@@ -1,5 +1,5 @@
 /**
- * 
+ *  2016 spring Text Mining machine problem
  */
 package analyzer;
 
@@ -866,39 +866,40 @@ public class DocAnalyzer {
 		
 		
 		DocAnalyzer analyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
-		DocAnalyzer analyzer2 = new DocAnalyzer("./data/Model/en-token.bin", 2);
+//		DocAnalyzer analyzer2 = new DocAnalyzer("./data/Model/en-token.bin", 2);
 
 		//code for demonstrating tokenization and stemming
 //		analyzer.TokenizerDemon("I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
 		// analyzer.TokenizerDemon("this is just a test sentence for the function");
 			
 		//entry point to deal with a collection of documents
-//		HashMap<String, Token> all_TFs, all_DFs;
-//		all_TFs = new HashMap<String, Token>();
-//		all_DFs = new HashMap<String, Token>();
-//		analyzer.LoadStopwords("init_stop_words.txt");
+		HashMap<String, Token> all_TFs, all_DFs;
+		all_TFs = new HashMap<String, Token>();
+		all_DFs = new HashMap<String, Token>();
+		analyzer.LoadStopwords("init_stop_words.txt");
 //		analyzer2.LoadStopwords("init_stop_words.txt");
-//		analyzer.LoadDirectory("./Data/yelp/train", ".json");
+		analyzer.LoadDirectory("./Data/yelps/train", ".json");
+		analyzer.LoadDirectory("./Data/yelps/test", ".json"); // in text categorizaiton, loading all json files
 //		analyzer2.LoadDirectory("./Data/yelp/train", ".json");
 //		
-//		all_DFs.putAll(analyzer.m_dfstats);
+		all_DFs.putAll(analyzer.m_dfstats);
 //		all_DFs.putAll(analyzer2.m_dfstats);
 //		
 //		
 //		analyzer.LoadDirectory("./Data/yelp/test", ".json");
 //		analyzer2.LoadDirectory("./Data/yelp/test", ".json");
 //
-//		all_TFs.putAll(analyzer.m_stats);
+		all_TFs.putAll(analyzer.m_stats);
 //		all_TFs.putAll(analyzer2.m_stats);
 //		
 //		
-//		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
-//		DocAnalyzer.OutputWordCount(all_tf_sorted, "alltf.txt");
-//		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
-//		DocAnalyzer.OutputWordCount(all_df_sorted, "N_allDF.txt"); 
-//		analyzer.BuildCVocabulary(all_df_sorted);//Build Controlled vocabulary
-//		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "N_CtrlVocabulary.txt");
-//		DocAnalyzer.OutputWordList(analyzer.m_stopwords, "Final_stop_words.txt");
+		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
+		DocAnalyzer.OutputWordCount(all_tf_sorted, "alltf.txt");
+		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
+		DocAnalyzer.OutputWordCount(all_df_sorted, "N_allDF.txt"); 
+		analyzer.BuildCVocabulary(all_df_sorted);//Build Controlled vocabulary
+		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "N_CtrlVocabulary.txt");
+		DocAnalyzer.OutputWordList(analyzer.m_stopwords, "Final_stop_words.txt");
 		
 		//***************************************************
 		// Above are the preprocessing
@@ -923,70 +924,75 @@ public class DocAnalyzer {
 //		}
 //		
 //		SimiAnalyzer.CalcSimi();
+		
 //		//*******************************************************
 		// MP2 starts here
-		analyzer.LoadLMDir("./data/yelp/train", ".json");
-		analyzer.createLanguageModel();
-		System.out.println("build unigram model complete...");
-		analyzer2.LoadLMDir("./data/yelp/train", ".json");
-		analyzer2.createLanguageModel();
-		System.out.println("build bigram model complete...");
+//		analyzer.LoadLMDir("./data/yelp/train", ".json");
+//		analyzer.createLanguageModel();
+//		System.out.println("build unigram model complete...");
+//		analyzer2.LoadLMDir("./data/yelp/train", ".json");
+//		analyzer2.createLanguageModel();
+//		System.out.println("build bigram model complete...");
+//		
+//		LanguageModel unigram = analyzer.m_langModel;
+//		LanguageModel bigram = analyzer2.m_langModel;
+//		bigram.setRefModel(unigram);
+//		bigram.setUniKeySet(unigram.getModel().keySet());
+//		
+////		HashMap<String, Token> unimodel = analyzer.m_langModel.getModel();
+//		List<Map.Entry<String, Double>> q1 = bigram.ProbQuery("good", "lin");
+//		List<Map.Entry<String, Double>> q2 = bigram.ProbQuery("good", "abs");
+//		for (int i = 0; i < 10; i++)
+//		{
+//			System.out.println(q1.get(i).getKey() + " : " + q1.get(i).getValue());
+//			System.out.println(q2.get(i).getKey() + " : " + q2.get(i).getValue());
+//			System.out.println("-------------------");
+//		}
+//		
+//
+//		List<String> uniSen, biSenLin, biSenAbs;
+//		uniSen = new ArrayList<String>();
+//		biSenLin = new ArrayList<String>();
+//		biSenAbs = new ArrayList<String>();
+//		for (int i = 0; i < 10; i++)
+//		{
+//			String temp;
+//			System.out.println("Generating the " + i + "th sentence...");
+//			
+//			temp = unigram.genSentance(15, 1, "lin");
+//			System.out.print(temp);
+//			uniSen.add(temp);
+//			
+//			temp = bigram.genSentance(15, 2, "lin");
+//			System.out.print(temp);
+//			biSenLin.add(temp);
+//			
+//			temp = bigram.genSentance(15, 2, "abs");
+//			System.out.print(temp);
+//			biSenAbs.add(temp);
+//		}
+//		
+//		OutputWordList(uniSen, "uniSentence.txt");
+//		OutputWordList(biSenLin, "biSentenceLin.txt");
+//		OutputWordList(biSenAbs, "biSentenceAbs.txt");
+//		
+//		
+//		analyzer.clearReview();
+//		analyzer.LoadLMDir("./data/yelp/test", ".json");
+//		System.out.println("reviews in test set loaded.");
+//		double pp1, pp2, pp3;
+//		pp1 = analyzer.PPcalc(unigram, "lin");
+//		System.out.println("pp1 : " + pp1);
+//		pp2 = analyzer.PPcalc(bigram, "lin");
+//		System.out.println("pp2 : " + pp2);
+//		pp3 = analyzer.PPcalc(bigram, "abs");
+//		System.out.println("pp3 : " + pp3);
+//		
+//		System.out.println("complete.");
 		
-		LanguageModel unigram = analyzer.m_langModel;
-		LanguageModel bigram = analyzer2.m_langModel;
-		bigram.setRefModel(unigram);
-		bigram.setUniKeySet(unigram.getModel().keySet());
+		//*******************************************************
+		// MP3 (text categorization) starts here
 		
-//		HashMap<String, Token> unimodel = analyzer.m_langModel.getModel();
-		List<Map.Entry<String, Double>> q1 = bigram.ProbQuery("good", "lin");
-		List<Map.Entry<String, Double>> q2 = bigram.ProbQuery("good", "abs");
-		for (int i = 0; i < 10; i++)
-		{
-			System.out.println(q1.get(i).getKey() + " : " + q1.get(i).getValue());
-			System.out.println(q2.get(i).getKey() + " : " + q2.get(i).getValue());
-			System.out.println("-------------------");
-		}
-		
-
-		List<String> uniSen, biSenLin, biSenAbs;
-		uniSen = new ArrayList<String>();
-		biSenLin = new ArrayList<String>();
-		biSenAbs = new ArrayList<String>();
-		for (int i = 0; i < 10; i++)
-		{
-			String temp;
-			System.out.println("Generating the " + i + "th sentence...");
-			
-			temp = unigram.genSentance(15, 1, "lin");
-			System.out.print(temp);
-			uniSen.add(temp);
-			
-			temp = bigram.genSentance(15, 2, "lin");
-			System.out.print(temp);
-			biSenLin.add(temp);
-			
-			temp = bigram.genSentance(15, 2, "abs");
-			System.out.print(temp);
-			biSenAbs.add(temp);
-		}
-		
-		OutputWordList(uniSen, "uniSentence.txt");
-		OutputWordList(biSenLin, "biSentenceLin.txt");
-		OutputWordList(biSenAbs, "biSentenceAbs.txt");
-		
-		
-		analyzer.clearReview();
-		analyzer.LoadLMDir("./data/yelp/test", ".json");
-		System.out.println("reviews in test set loaded.");
-		double pp1, pp2, pp3;
-		pp1 = analyzer.PPcalc(unigram, "lin");
-		System.out.println("pp1 : " + pp1);
-		pp2 = analyzer.PPcalc(bigram, "lin");
-		System.out.println("pp2 : " + pp2);
-		pp3 = analyzer.PPcalc(bigram, "abs");
-		System.out.println("pp3 : " + pp3);
-		
-		System.out.println("complete.");
 	}
 
 }
