@@ -864,12 +864,17 @@ public class DocAnalyzer {
 		double pos_num = 0;
 		double neg_num = 0;
 		HashMap<String, Double> termCount = new HashMap<String, Double>(); // the count of reviews that a term appears
-		
+		HashMap<String, Double> termPosCount = new HashMap<String, Double>(); // the count of Pos reviews that a term appears
+		HashMap<String, Double> termNegCount = new HashMap<String, Double>(); // the count of Neg reviews that a term appears
 		for (int i = 0; i < m_reviews.size(); i++)
 		{
 			rating = m_reviews.get(i).getRating();
+			boolean pos = false;
 			if (rating >= 4)
+			{
 				pos_num += 1;
+				pos = true;
+			}
 			else
 				neg_num += 1;
 			
@@ -880,14 +885,40 @@ public class DocAnalyzer {
 				tok = SnowballStemming(Normalization(tok));
 				terms.add(tok);
 			}
+			
 			String[] termsarray = terms.toArray(new String[0]);
 			for (String thisterm : termsarray)
 			{
-				if (termCount.containsKey(thisterm))
+				if (termCount.containsKey(thisterm))//get the term count on the bases of all reviews
 				{
 					Double temp = termCount.get(thisterm).doubleValue();
 					temp += 1;
 					termCount.put(thisterm, temp);
+				}
+				else
+					termCount.put(thisterm, 1.0);
+				
+				if (pos)//get the term count on the bases of Pos reviews
+				{
+					if (termPosCount.containsKey(thisterm))
+					{
+						Double temp = termPosCount.get(thisterm).doubleValue();
+						temp += 1;
+						termPosCount.put(thisterm, temp);
+					}
+					else
+						termPosCount.put(thisterm, 1.0);
+				}
+				else//get the term count on the bases of Neg reviews
+				{
+					if (termNegCount.containsKey(thisterm))
+					{
+						Double temp = termNegCount.get(thisterm).doubleValue();
+						temp += 1;
+						termNegCount.put(thisterm, temp);
+					}
+					else
+						termNegCount.put(thisterm, 1.0);
 				}
 			}
 		}
@@ -903,9 +934,18 @@ public class DocAnalyzer {
 			term1 -= p_1 * Math.log10(p_1);
 		if (p_0 != 0.0)
 			term1 -= p_0 * Math.log10(p_0);
+		
 		for (Map.Entry<String, Double> entry : termCount.entrySet())
 		{
+			term2 = 0.0;
+			term3 = 0.0;
 			double p_t = entry.getValue() / review_num;
+			double p_y_t = termPosCount.get(entry).doubleValue() / entry.getValue();
+			if (p_1 != 0.0)
+				term2 += p_1 * Math.log10(p_1);
+			if (p_0 != 0.0)
+				term2 += p_0 * Math.log10(p_0);
+			
 			
 		}
 		
