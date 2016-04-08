@@ -326,6 +326,7 @@ public class DocAnalyzer {
 							{
 								Token newt = new Token(m_stats.size(), tok);
 								newt.setValue(1); 
+								newt.setPosNeg(review.getRating());
 								m_stats.put(tok, newt);
 							}
 						}
@@ -857,7 +858,63 @@ public class DocAnalyzer {
 		}
 	}
 	
-	
+	public void calc_IG(HashMap<String, Double> IG)// calculate the information gain of each term and store in IG
+	{
+		double rating;
+		double pos_num = 0;
+		double neg_num = 0;
+		HashMap<String, Double> termCount = new HashMap<String, Double>(); // the count of reviews that a term appears
+		
+		for (int i = 0; i < m_reviews.size(); i++)
+		{
+			rating = m_reviews.get(i).getRating();
+			if (rating >= 4)
+				pos_num += 1;
+			else
+				neg_num += 1;
+			
+			HashSet<String> terms = new HashSet<String>(); //for each round, gather the existence of a term
+			String[] tokens = m_reviews.get(i).getTokens();
+			for (String tok : tokens)
+			{
+				tok = SnowballStemming(Normalization(tok));
+				terms.add(tok);
+			}
+			String[] termsarray = terms.toArray(new String[0]);
+			for (String thisterm : termsarray)
+			{
+				if (termCount.containsKey(thisterm))
+				{
+					Double temp = termCount.get(thisterm).doubleValue();
+					temp += 1;
+					termCount.put(thisterm, temp);
+				}
+			}
+		}
+		
+		double review_num = pos_num + neg_num;
+		double p_1 = pos_num / review_num;//the p(y) value
+		double p_0 = neg_num / review_num;
+		
+		double term1 = 0.0;// these 3 terms are the terms in the equation of IG in the homework page
+		double term2;
+		double term3;
+		if (p_1 != 0.0)
+			term1 -= p_1 * Math.log10(p_1);
+		if (p_0 != 0.0)
+			term1 -= p_0 * Math.log10(p_0);
+		for (Map.Entry<String, Double> entry : termCount.entrySet())
+		{
+			double p_t = entry.getValue() / review_num;
+			
+		}
+		
+		
+//		for (Map.Entry<String, Token> entry : m_stats.entrySet())
+//		{
+//			IG.put(entry.getKey() , entry.getValue().getValue())
+//		}
+	}
 	
 	
 	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException 
@@ -893,13 +950,13 @@ public class DocAnalyzer {
 //		all_TFs.putAll(analyzer2.m_stats);
 //		
 //		
-		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
-		DocAnalyzer.OutputWordCount(all_tf_sorted, "alltf.txt");
-		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
-		DocAnalyzer.OutputWordCount(all_df_sorted, "N_allDF.txt"); 
-		analyzer.BuildCVocabulary(all_df_sorted);//Build Controlled vocabulary
-		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "N_CtrlVocabulary.txt");
-		DocAnalyzer.OutputWordList(analyzer.m_stopwords, "Final_stop_words.txt");
+//		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
+//		DocAnalyzer.OutputWordCount(all_tf_sorted, "alltf.txt");
+//		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
+//		DocAnalyzer.OutputWordCount(all_df_sorted, "N_allDF.txt"); 
+//		analyzer.BuildCVocabulary(all_df_sorted);//Build Controlled vocabulary
+//		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "N_CtrlVocabulary.txt");
+//		DocAnalyzer.OutputWordList(analyzer.m_stopwords, "Final_stop_words.txt");
 		
 		//***************************************************
 		// Above are the preprocessing
@@ -992,6 +1049,10 @@ public class DocAnalyzer {
 		
 		//*******************************************************
 		// MP3 (text categorization) starts here
+		
+		
+		// first, get the information gain
+		HashMap<String, Double> IG = new HashMap<String, Double>();
 		
 	}
 

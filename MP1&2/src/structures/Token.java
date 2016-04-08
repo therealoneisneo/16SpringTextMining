@@ -10,6 +10,10 @@ package structures;
 public class Token {
 
 	int m_id; // the numerical ID you assigned to this token/N-gram
+	String m_token; // the actual text content of this token/N-gram
+	boolean Pos = false;// indicator for if this term appeared in Positive or Negative reviews
+	boolean Neg = false;
+	
 	public int getID() {
 		return m_id;
 	}
@@ -18,7 +22,7 @@ public class Token {
 		this.m_id = id;
 	}
 
-	String m_token; // the actual text content of this token/N-gram
+	
 	public String getToken() {
 		return m_token;
 	}
@@ -47,5 +51,13 @@ public class Token {
 		m_token = token;
 		m_id = id;
 		m_value = 0;		
+	}
+	
+	public void setPosNeg(double score)
+	{
+		if (score >= 4)
+			Pos = true;
+		else
+			Neg = true;
 	}
 }
