@@ -728,6 +728,24 @@ public class DocAnalyzer {
 		return entrylist;
 	}
 	
+	public static List<Map.Entry<String, Double>> SortHashMap_double(HashMap<String, Double> wordlist)
+	{
+		List<Map.Entry<String, Double>> entrylist = new ArrayList<Map.Entry<String, Double>>(wordlist.entrySet());
+
+		Collections.sort(entrylist, new Comparator<Map.Entry<String, Double>>()
+			{public int compare(Map.Entry<String, Double> o1, Map.Entry<String, Double> o2)
+				{
+					if (o2.getValue() > o1.getValue())
+						return 1;
+					else if(o2.getValue() == o1.getValue())
+						return 0;
+					else
+						return -1;
+				}
+			});
+		return entrylist;
+	}
+	
 	public static void ZipfsLaw(HashMap<String, Token> m_stats, String Filename)
 	{
 
@@ -761,6 +779,7 @@ public class DocAnalyzer {
 	public void BuildCVocabulary(List<Map.Entry<String, Token>> all_df_sorted)
 	{
 		int count = 0;
+		m_CtrlVocabulary.clear();
 		System.out.println("Building CV...");
 		for (Map.Entry<String, Token> entry : all_df_sorted)
 		{
@@ -782,7 +801,18 @@ public class DocAnalyzer {
 		}
 	}
 	
-	
+	public void BuildCVocabulary2(List<Map.Entry<String, Token>> all_df_sorted) // the control vocabulary without remove the high frequency stop words for MP3
+	{
+		m_CtrlVocabulary.clear();
+		System.out.println("Building CV...");
+		for (Map.Entry<String, Token> entry : all_df_sorted)
+		{
+				double df = entry.getValue().getValue();
+				if (df < 50 || m_stopwords.contains(entry.getKey()))
+					break;
+				m_CtrlVocabulary.add(entry.getKey());
+		}
+	}
 	
 	public void TF_IDFCalc(Post review, HashMap<String, Double> DFs, int DocNum)
 	{
@@ -858,7 +888,7 @@ public class DocAnalyzer {
 		}
 	}
 	
-	public void calc_IG(HashMap<String, Double> IG)// calculate the information gain of each term and store in IG
+	public void Calc_IG(HashMap<String, Double> IG, HashMap<String, Double> ChiSq)// calculate the information gain of each term and store in IG
 	{
 		double rating;
 		double pos_num = 0;
@@ -883,7 +913,8 @@ public class DocAnalyzer {
 			for (String tok : tokens)
 			{
 				tok = SnowballStemming(Normalization(tok));
-				terms.add(tok);
+				if (m_CtrlVocabulary.contains(tok))
+					terms.add(tok);
 			}
 			
 			String[] termsarray = terms.toArray(new String[0]);
@@ -928,8 +959,8 @@ public class DocAnalyzer {
 		double p_0 = neg_num / review_num;
 		
 		double term1 = 0.0;// these 3 terms are the terms in the equation of IG in the homework page
-		double term2;
-		double term3;
+		double term2, term3;
+		double A,B,C,D;// these 4 terms are for the Chi sq computation.
 		if (p_1 != 0.0)
 			term1 -= p_1 * Math.log10(p_1);
 		if (p_0 != 0.0)
@@ -939,27 +970,80 @@ public class DocAnalyzer {
 		{
 			term2 = 0.0;
 			term3 = 0.0;
+			A = 0.0;
+			B = 0.0;
+			C = 0.0;
+			D = 0.0;
 			double p_t = entry.getValue() / review_num;
-			double p_y_t = termPosCount.get(entry).doubleValue() / entry.getValue();
-			if (p_1 != 0.0)
-				term2 += p_1 * Math.log10(p_1);
-			if (p_0 != 0.0)
-				term2 += p_0 * Math.log10(p_0);
+			double poscount = 0;// init the count of this term entry within pos and neg reviews
+			double negcount = 0;
+			String word = entry.getKey();
+
+			if (termPosCount.containsKey(word))// get the prob of pos and neg when observed the term
+			{
+				poscount = termPosCount.get(word).doubleValue();
+				A = poscount;
+			}
+			B = pos_num - poscount;
 			
+				
+			if (termNegCount.containsKey(word))
+			{
+				negcount = termNegCount.get(word).doubleValue();
+				C = negcount;
+			}
+			D = neg_num - negcount;
+			
+			double p_y1_t = poscount / (poscount + negcount);
+			// get the prob of pos and neg when not observe the term
+			double p_y1_nott = (pos_num - poscount) / ((1 - p_t) * review_num);
+			
+			
+			if (p_y1_t != 0.0 && p_y1_t != 1.0)
+				term2 = p_t * ( Math.log10(p_y1_t) * p_y1_t + Math.log10(1 - p_y1_t) * (1 - p_y1_t));
+			if (p_y1_nott != 0.0 && p_y1_nott != 1.0)
+				term3 = (1 - p_t)  * ( Math.log10(p_y1_nott) * p_y1_nott + Math.log10(1 - p_y1_nott) * (1 - p_y1_nott));
+			double current_result = term1 + term2 + term3;
+			IG.put(word, current_result); // the information gain
+			current_result = ((A + B + C + D) * (A * D - B * C) * (A * D - B * C)) / ((A + C) * (B + D) * (A + B) * (C + D));
+			ChiSq.put(word, current_result);
 			
 		}
-		
-		
-//		for (Map.Entry<String, Token> entry : m_stats.entrySet())
-//		{
-//			IG.put(entry.getKey() , entry.getValue().getValue())
-//		}
+
 	}
 	
+	public List<Map.Entry<String, Double>> ChiFilter(List<Map.Entry<String, Double>> ChiSqsorted, double Value_threshold, int Count_threshold)
+	{
+		List<Map.Entry<String, Double>> temp = new ArrayList<Map.Entry<String, Double>>();
+		int count = 0;
+		for (Map.Entry<String, Double> entry : ChiSqsorted)
+		{
+			if (count <= Count_threshold && entry.getValue() >= Value_threshold)
+			{
+				temp.add(entry);
+			}
+			count += 1;
+		}
+		return temp;
+	}
+	
+	public List<Map.Entry<String, Double>> IGFilter(List<Map.Entry<String, Double>> IGSqsorted, int Count_threshold)
+	{
+		List<Map.Entry<String, Double>> temp = new ArrayList<Map.Entry<String, Double>>();
+		int count = 0;
+		for (Map.Entry<String, Double> entry : IGSqsorted)
+		{
+			if (count <= Count_threshold )
+			{
+				temp.add(entry);
+			}
+			count += 1;
+		}
+		return temp;
+	}
 	
 	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException 
 	{	
-		
 		
 		
 		DocAnalyzer analyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
@@ -990,12 +1074,12 @@ public class DocAnalyzer {
 //		all_TFs.putAll(analyzer2.m_stats);
 //		
 //		
-//		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
-//		DocAnalyzer.OutputWordCount(all_tf_sorted, "alltf.txt");
-//		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
-//		DocAnalyzer.OutputWordCount(all_df_sorted, "N_allDF.txt"); 
+		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
+		DocAnalyzer.OutputWordCount(all_tf_sorted, "allTF.txt");
+		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
+		DocAnalyzer.OutputWordCount(all_df_sorted, "allDF.txt"); 
 //		analyzer.BuildCVocabulary(all_df_sorted);//Build Controlled vocabulary
-//		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "N_CtrlVocabulary.txt");
+//		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "CtrlVocabulary.txt");
 //		DocAnalyzer.OutputWordList(analyzer.m_stopwords, "Final_stop_words.txt");
 		
 		//***************************************************
@@ -1089,10 +1173,24 @@ public class DocAnalyzer {
 		
 		//*******************************************************
 		// MP3 (text categorization) starts here
-		
+		analyzer.BuildCVocabulary2(all_df_sorted);//Build Controlled vocabulary
 		
 		// first, get the information gain
 		HashMap<String, Double> IG = new HashMap<String, Double>();
+		HashMap<String, Double> ChiSq = new HashMap<String, Double>();
+		analyzer.Calc_IG(IG, ChiSq);
+		List<Map.Entry<String, Double>> IG_sorted = DocAnalyzer.SortHashMap_double(IG); // Sort the tokens by DF
+//		DocAnalyzer.OutputWordCount(IG_sorted, "SortedIG.txt");
+		List<Map.Entry<String, Double>> ChiSq_sorted = DocAnalyzer.SortHashMap_double(ChiSq); // Sort the tokens by DF
+//		DocAnalyzer.OutputWordCount(all_df_sorted, "allDF.txt"); 
+		IG_sorted = analyzer.IGFilter(IG_sorted, 5000);
+		ChiSq_sorted = analyzer.ChiFilter(ChiSq_sorted, 3.841, 5000);
+		HashSet<String> mergedCV = new HashSet<String>();
+		for (Map.Entry<String, Double> entry : IG_sorted)
+			mergedCV.add(entry.getKey());
+		for (Map.Entry<String, Double> entry : ChiSq_sorted)
+			mergedCV.add(entry.getKey());
+		analyzer.m_CtrlVocabulary = mergedCV;
 		
 	}
 
