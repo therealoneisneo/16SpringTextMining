@@ -65,6 +65,9 @@ public class DocAnalyzer {
 	
 	//this structure is for language modeling
 	LanguageModel m_langModel;
+	// MP3, the positive and negative language model
+	LanguageModel m_PoslangModel;
+	LanguageModel m_NeglangModel;
 	
 	public DocAnalyzer(String tokenModel, int N) throws InvalidFormatException, FileNotFoundException, IOException {
 
@@ -241,6 +244,25 @@ public class DocAnalyzer {
 		}
 	}
 	
+	public static void OutputWordCount2(List<Map.Entry<String, Double>> entrylist, String filename) // out put word list of <string,double>
+	{
+		try
+		{
+			File writename = new File(filename);
+			writename.createNewFile();
+			BufferedWriter out = new BufferedWriter(new FileWriter(writename));  
+			for (Entry<String, Double> entry : entrylist)
+			{
+				out.write(entry.getKey() + "," + entry.getValue() + "\r\n");
+			}
+			out.flush();
+			out.close(); 
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+	}
 	
 	public static void OutputWordList(HashSet<String> entrylist, String filename)
 	{
@@ -255,6 +277,7 @@ public class DocAnalyzer {
 			}
 			out.flush();
 			out.close(); 
+			System.out.println(filename + " saved!");
 		  
 		} 
 		catch (Exception e)
@@ -610,7 +633,48 @@ public class DocAnalyzer {
 		}
 	}
 	
-	
+	public void createPosNegLanguageModel() // create 2 language models based on Pos and Neg reveiws
+	{
+		m_PoslangModel = new LanguageModel(m_N);
+		m_NeglangModel = new LanguageModel(m_N);
+//		int count = 0;
+		if (m_N == 1)// unigram model, calculate all terms
+		{
+			for(Post review : m_reviews) 
+			{	
+				String[] tokens = review.getTokens();
+				if (review.getRating() >= 4) // Pos
+				{
+					for (String tok : tokens)
+					{
+						tok = SnowballStemming(Normalization(tok));
+						if (tok.length() > 0)
+						{
+							m_PoslangModel.increCount(); 
+							m_PoslangModel.addToken(tok); // add token to the m_model
+						}	
+					}
+				}
+				else // Neg
+				{
+					for (String tok : tokens)
+					{
+						tok = SnowballStemming(Normalization(tok));
+						if (tok.length() > 0)
+						{
+							m_NeglangModel.increCount(); 
+							m_NeglangModel.addToken(tok); // add token to the m_model
+						}	
+					}
+				}
+				
+				/**
+				 * HINT: essentially you will perform very similar operations as what you have done in analyzeDocument() 
+				 * Now you should properly update the counts in LanguageModel structure such that we can perform maximum likelihood estimation on it
+				 */
+			}
+		}
+	}
 	
 	
 	
@@ -888,7 +952,7 @@ public class DocAnalyzer {
 		}
 	}
 	
-	public void Calc_IG(HashMap<String, Double> IG, HashMap<String, Double> ChiSq)// calculate the information gain of each term and store in IG
+	public void Calc_IG_Chi(HashMap<String, Double> IG, HashMap<String, Double> ChiSq)// calculate the information gain of each term and store in IG
 	{
 		double rating;
 		double pos_num = 0;
@@ -1042,6 +1106,62 @@ public class DocAnalyzer {
 		return temp;
 	}
 	
+	public void BuildSparseVec()//build the sparse vecter representation for all reviews based on the ctrl vocabulary
+	{
+		ArrayList<Post> temp = new ArrayList<Post>();
+		for (int i = 0; i < m_reviews.size(); i++)
+		{
+			m_reviews.get(i).initSparseVec();
+			String[] tokens = m_reviews.get(i).getTokens();
+			for (String tok : tokens)
+			{
+				tok = SnowballStemming(Normalization(tok));
+				if (m_CtrlVocabulary.contains(tok))	
+				{
+					m_reviews.get(i).AddVct(tok);
+				}
+					
+			}
+			if (m_reviews.get(i).getVct().size() > 5)//eliminate the reviews with less than 5 non-empty entry in the vec representation.
+				temp.add(m_reviews.get(i));
+		}
+		
+		m_reviews = temp;
+	}
+	
+	public double SparceVecDot(HashMap<String, Double> v1, HashMap<String, Double> v2)
+	{
+		double result = 0.0;
+		for(Map.Entry<String, Double> entry : v1.entrySet())
+		{
+			if (v2.containsKey(entry.getKey()))
+				result += entry.getValue() * v2.get(entry.getKey());
+		}
+		return result;
+	}
+	
+	public List<Map.Entry<String, Double>> NBPosNegProb() // for MP3 task2.1 find the log probs.
+	{
+		HashMap<String, Double> prob = new HashMap<String, Double>();
+		double posP, negP;
+		m_PoslangModel.setDelta(0.1);
+		m_NeglangModel.setDelta(0.1);
+		for (int i = 0; i < m_reviews.size(); i++)
+		{
+			System.out.print("processing review No." + i);
+			String[] tokens = m_reviews.get(i).getTokens();
+			for (String tok : tokens)
+			{
+				tok = SnowballStemming(Normalization(tok));
+				posP = m_PoslangModel.calcAddSmoothedProb(tok);
+				negP = m_NeglangModel.calcAddSmoothedProb(tok);
+				prob.put(tok, Math.log(posP / negP));
+			}
+		}
+//		List<Map.Entry<String, Double>> sorted = new ArrayList<Map.Entry<String, Double>>();
+		return SortHashMap_double(prob);
+	}
+	
 	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException 
 	{	
 		
@@ -1059,8 +1179,8 @@ public class DocAnalyzer {
 		all_DFs = new HashMap<String, Token>();
 		analyzer.LoadStopwords("init_stop_words.txt");
 //		analyzer2.LoadStopwords("init_stop_words.txt");
-		analyzer.LoadDirectory("./Data/yelps/train", ".json");
-		analyzer.LoadDirectory("./Data/yelps/test", ".json"); // in text categorizaiton, loading all json files
+		analyzer.LoadDirectory("./Data/yelp/train", ".json");
+		analyzer.LoadDirectory("./Data/yelp/test", ".json"); // in text categorizaiton, loading all json files
 //		analyzer2.LoadDirectory("./Data/yelp/train", ".json");
 //		
 		all_DFs.putAll(analyzer.m_dfstats);
@@ -1073,11 +1193,11 @@ public class DocAnalyzer {
 		all_TFs.putAll(analyzer.m_stats);
 //		all_TFs.putAll(analyzer2.m_stats);
 //		
-//		
-		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
-		DocAnalyzer.OutputWordCount(all_tf_sorted, "allTF.txt");
-		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
-		DocAnalyzer.OutputWordCount(all_df_sorted, "allDF.txt"); 
+//		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
+//		DocAnalyzer.OutputWordCount(all_tf_sorted, "allTF.txt");
+//		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
+//		DocAnalyzer.OutputWordCount(all_df_sorted, "allDF.txt"); 
+		
 //		analyzer.BuildCVocabulary(all_df_sorted);//Build Controlled vocabulary
 //		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "CtrlVocabulary.txt");
 //		DocAnalyzer.OutputWordList(analyzer.m_stopwords, "Final_stop_words.txt");
@@ -1173,24 +1293,41 @@ public class DocAnalyzer {
 		
 		//*******************************************************
 		// MP3 (text categorization) starts here
-		analyzer.BuildCVocabulary2(all_df_sorted);//Build Controlled vocabulary
 		
-		// first, get the information gain
-		HashMap<String, Double> IG = new HashMap<String, Double>();
-		HashMap<String, Double> ChiSq = new HashMap<String, Double>();
-		analyzer.Calc_IG(IG, ChiSq);
-		List<Map.Entry<String, Double>> IG_sorted = DocAnalyzer.SortHashMap_double(IG); // Sort the tokens by DF
-//		DocAnalyzer.OutputWordCount(IG_sorted, "SortedIG.txt");
-		List<Map.Entry<String, Double>> ChiSq_sorted = DocAnalyzer.SortHashMap_double(ChiSq); // Sort the tokens by DF
-//		DocAnalyzer.OutputWordCount(all_df_sorted, "allDF.txt"); 
-		IG_sorted = analyzer.IGFilter(IG_sorted, 5000);
-		ChiSq_sorted = analyzer.ChiFilter(ChiSq_sorted, 3.841, 5000);
-		HashSet<String> mergedCV = new HashSet<String>();
-		for (Map.Entry<String, Double> entry : IG_sorted)
-			mergedCV.add(entry.getKey());
-		for (Map.Entry<String, Double> entry : ChiSq_sorted)
-			mergedCV.add(entry.getKey());
-		analyzer.m_CtrlVocabulary = mergedCV;
+//		analyzer.BuildCVocabulary2(all_df_sorted);//Build Controlled vocabulary
+//		
+//		// first, get the information gain
+//		HashMap<String, Double> IG = new HashMap<String, Double>();
+//		HashMap<String, Double> ChiSq = new HashMap<String, Double>();
+//		analyzer.Calc_IG_Chi(IG, ChiSq);
+//		List<Map.Entry<String, Double>> IG_sorted = DocAnalyzer.SortHashMap_double(IG); // Sort the tokens by DF
+////		DocAnalyzer.OutputWordCount(IG_sorted, "SortedIG.txt");
+//		List<Map.Entry<String, Double>> ChiSq_sorted = DocAnalyzer.SortHashMap_double(ChiSq); // Sort the tokens by DF
+////		DocAnalyzer.OutputWordCount(all_df_sorted, "allDF.txt"); 
+//		IG_sorted = analyzer.IGFilter(IG_sorted, 5000); // take first 5000
+//		ChiSq_sorted = analyzer.ChiFilter(ChiSq_sorted, 3.841, 5000); //take first 5000 and threshold 3.841
+//		HashSet<String> mergedCV = new HashSet<String>();
+//		for (Map.Entry<String, Double> entry : IG_sorted)
+//			mergedCV.add(entry.getKey());
+//		for (Map.Entry<String, Double> entry : ChiSq_sorted)
+//			mergedCV.add(entry.getKey());
+//		analyzer.m_CtrlVocabulary = mergedCV;
+//		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "CtrlVocabulary.txt");
+//		DocAnalyzer.OutputWordCount2(IG_sorted, "IGsort.txt");
+//		DocAnalyzer.OutputWordCount2(ChiSq_sorted, "ChiSqsort.txt");
+		
+		
+		// feature selection complete
+		analyzer.LoadVocabulary("CtrlVocabulary.txt");
+		System.out.println("Building Sparse Vectors...");
+		analyzer.BuildSparseVec();
+		System.out.println("Creating language Models...");
+		analyzer.createPosNegLanguageModel();
+		System.out.println("Calculating neg and pos probs...");
+		List<Map.Entry<String, Double>> logprobs = analyzer.NBPosNegProb();
+		DocAnalyzer.OutputWordCount2(logprobs, "probs.txt");
+//		double a = 1.0;
+//		logprobs = SortHashMap_double(logprobs);
 		
 	}
 

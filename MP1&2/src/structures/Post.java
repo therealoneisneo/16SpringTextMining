@@ -121,13 +121,26 @@ public class Post {
 		m_tokens = tokens;
 	}
 	
-	HashMap<String, Token> m_vector; // suggested sparse structure for storing the vector space representation with N-grams for this document
-	public HashMap<String, Token> getVct() {
+	HashMap<String, Double> m_vector; // suggested sparse structure for storing the vector space representation with N-grams for this document
+	
+	public void initSparseVec()
+	{
+		m_vector = new HashMap<String, Double>();
+	}
+	
+	public HashMap<String, Double> getVct() {
 		return m_vector;
 	}
 	
-	public void setVct(HashMap<String, Token> vct) {
-		m_vector = vct;
+	public void AddVct(String term) {
+		if(m_vector.containsKey(term))
+		{
+			double temp = m_vector.get(term);
+			temp += 1;
+			m_vector.put(term, temp);
+		}
+		else
+			m_vector.put(term, 1.0);
 	}
 	
 	public double similiarity(Post p) {

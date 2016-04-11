@@ -196,12 +196,15 @@ public class LanguageModel {
 		else
 		{
 			if (m_model.containsKey(token))
-			{
 				return m_model.get(token).getValue();// / m_totalcount;
-			}
 			else
 				return 0;
 		}
+	}
+	
+	public double calcAddSmoothedProb(String token) // for MP3 Task2, the addtive smooth of Naive Bayes
+	{
+		return (calcMLProb(token) + m_delta) / (m_totalcount + m_delta * m_model.size());
 	}
 	
 	public double calcAbsCount(String token) // when doing the absolute discounting smoothing, need to calculate the max(c[i,i-1] - delta, 0)/c[i -1]
