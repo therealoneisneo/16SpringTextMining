@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
@@ -274,6 +275,34 @@ public class DocAnalyzer {
 			for (String entry : entrylist)
 			{
 				out.write(entry + "\r\n");
+			}
+			out.flush();
+			out.close(); 
+			System.out.println(filename + " saved!");
+		  
+		} 
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+	}
+	
+	public static void OutputPRList(List<Map.Entry<Double, double[]>> PRs, String filename) // out put the multiple delta PR result
+	{
+		try
+		{
+			File writename = new File(filename);
+			writename.createNewFile();
+			BufferedWriter out = new BufferedWriter(new FileWriter(writename));  
+			for (Map.Entry<Double, double[]> entry : PRs)
+			{
+				out.write(String.valueOf(entry.getKey()) + ',' + String.valueOf(entry.getValue()[0]) + ',' + String.valueOf(entry.getValue()[1]) + "\r\n");
+//				out.write(',');
+//				out.write(entry.getValue()[0]);
+//				out.write(',');
+//				out.write(entry.getValue()[1];
+//				out.write();
+////				+ ',' + entry.getValue()[0] + ',' + entry.getValue()[1] + );
 			}
 			out.flush();
 			out.close(); 
@@ -637,14 +666,17 @@ public class DocAnalyzer {
 	{
 		m_PoslangModel = new LanguageModel(m_N);
 		m_NeglangModel = new LanguageModel(m_N);
-//		int count = 0;
+		int count = 0;
 		if (m_N == 1)// unigram model, calculate all terms
 		{
 			for(Post review : m_reviews) 
 			{	
+				System.out.println("Language model : " + count);
+				count += 1;
 				String[] tokens = review.getTokens();
 				if (review.getRating() >= 4) // Pos
 				{
+					m_PoslangModel.IncreDocNum(1);
 					for (String tok : tokens)
 					{
 						tok = SnowballStemming(Normalization(tok));
@@ -657,6 +689,7 @@ public class DocAnalyzer {
 				}
 				else // Neg
 				{
+					m_NeglangModel.IncreDocNum(1);
 					for (String tok : tokens)
 					{
 						tok = SnowballStemming(Normalization(tok));
@@ -1146,25 +1179,120 @@ public class DocAnalyzer {
 		double posP, negP;
 		m_PoslangModel.setDelta(0.1);
 		m_NeglangModel.setDelta(0.1);
+		int count = 0;
 		for (int i = 0; i < m_reviews.size(); i++)
 		{
-			System.out.print("processing review No." + i);
+			System.out.println(" PosNeg calc : " + count);
+			count += 1;
 			String[] tokens = m_reviews.get(i).getTokens();
 			for (String tok : tokens)
 			{
 				tok = SnowballStemming(Normalization(tok));
-				posP = m_PoslangModel.calcAddSmoothedProb(tok);
-				negP = m_NeglangModel.calcAddSmoothedProb(tok);
-				prob.put(tok, Math.log(posP / negP));
+				if(tok.length() > 0)
+				{
+					posP = m_PoslangModel.calcAddSmoothedProb(tok);
+					negP = m_NeglangModel.calcAddSmoothedProb(tok);
+					prob.put(tok, Math.log(posP / negP));
+				}
+				
 			}
 		}
 //		List<Map.Entry<String, Double>> sorted = new ArrayList<Map.Entry<String, Double>>();
-		return SortHashMap_double(prob);
+		return DocAnalyzer.SortHashMap_double(prob);
+	}
+	
+	public double NaiveBayesScore(Post review)
+	{
+		double result = Math.log((m_PoslangModel.getDocNum()) / (m_NeglangModel.getDocNum()));
+		String[] tokens = review.getTokens();
+		for (String tok : tokens)
+		{
+			tok = SnowballStemming(Normalization(tok));
+			if(tok.length() > 0)
+				result += Math.log((m_PoslangModel.calcAddSmoothedProb(tok)) / (m_NeglangModel.calcAddSmoothedProb(tok)));
+		}
+		return result;
+	}
+//	HashMap<Integer, Double> score
+	public List<Map.Entry<String, Double>> NaiveBayesClassifyer()
+	{
+		HashMap<String, Double> scores = new HashMap<String, Double>();
+		for (int i = 0; i < m_reviews.size(); i++)
+			scores.put(m_reviews.get(i).getID(), NaiveBayesScore(m_reviews.get(i)));
+		return SortHashMap_double(scores);
+	}
+	
+	public HashMap<String, Integer> getDocNegPos() // get the reviews Pos or Neg by there reviewID(String)
+	{
+		HashMap<String, Integer> result = new HashMap<String, Integer>();
+		for (int i = 0; i < m_reviews.size(); i++)
+		{
+			if (m_reviews.get(i).getRating() >= 4)
+				result.put(m_reviews.get(i).getID(), 1);
+			else
+				result.put(m_reviews.get(i).getID(), -1);
+		}
+		return result;
+	}
+	
+	public double[] CalcPR(List<Map.Entry<String, Double>> predict, HashMap<String, Integer> truth)// precision and recall score
+	{
+		double[] pr = {0.0, 0.0};
+		int TP,FP,TN,FN;
+		String id;
+		TP = 0;
+		FP = 0;
+		TN = 0;
+		FN = 0;
+		for(int i = 0; i < predict.size(); i++)
+		{
+			id = predict.get(i).getKey();
+			if (predict.get(i).getValue() > 0) // predict as a positive
+			{
+				if (truth.get(id).intValue() > 0)
+					TP += 1;
+				else
+					FP += 1;
+			}
+			else
+			{
+				if (truth.get(id).intValue() > 0)
+					FN += 1;
+				else
+					TN += 1;
+			}
+		}
+		pr[0] = (double)TP / (TP + FP);
+		pr[1] = (double)TP / (TP + FN);
+		return pr;
+	}
+	
+	public List<Map.Entry<Double, double[]>> multipleDeltaPR()
+	{
+		HashMap<String, Integer> classtruth = getDocNegPos();
+		List<Map.Entry<Double, double[]>> PRs = new ArrayList<Map.Entry<Double, double[]>>();
+		for (double i = 1; i < 20; i = i + 2)
+		{
+			double delta = i / 10;
+			m_NeglangModel.setDelta(delta);
+			m_PoslangModel.setDelta(delta);
+			List<Map.Entry<String, Double>> NBresult = NaiveBayesClassifyer();
+			double[] pr = CalcPR(NBresult, classtruth); 
+			PRs.add(new AbstractMap.SimpleEntry<Double, double[]>(delta, pr.clone()));
+		}
+		return PRs;
+	}
+	
+	public double[] CrossValidation() // 10 fold CV for NB and KNN
+	{
+		double[] results = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // first 3 are NBs P,R,F average, Last 3 are KNN's P,R,F average
+		Collections.shuffle(m_reviews);
+		return results;
 	}
 	
 	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException 
 	{	
-		
+		System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
 		
 		DocAnalyzer analyzer = new DocAnalyzer("./data/Model/en-token.bin", 1);
 //		DocAnalyzer analyzer2 = new DocAnalyzer("./data/Model/en-token.bin", 2);
@@ -1179,8 +1307,8 @@ public class DocAnalyzer {
 		all_DFs = new HashMap<String, Token>();
 		analyzer.LoadStopwords("init_stop_words.txt");
 //		analyzer2.LoadStopwords("init_stop_words.txt");
-		analyzer.LoadDirectory("./Data/yelp/train", ".json");
-		analyzer.LoadDirectory("./Data/yelp/test", ".json"); // in text categorizaiton, loading all json files
+		analyzer.LoadDirectory("./Data/yelps/train", ".json");
+		analyzer.LoadDirectory("./Data/yelps/test", ".json"); // in text categorizaiton, loading all json files
 //		analyzer2.LoadDirectory("./Data/yelp/train", ".json");
 //		
 		all_DFs.putAll(analyzer.m_dfstats);
@@ -1319,16 +1447,35 @@ public class DocAnalyzer {
 		
 		// feature selection complete
 		analyzer.LoadVocabulary("CtrlVocabulary.txt");
+		
 		System.out.println("Building Sparse Vectors...");
 		analyzer.BuildSparseVec();
+		
 		System.out.println("Creating language Models...");
 		analyzer.createPosNegLanguageModel();
+		
 		System.out.println("Calculating neg and pos probs...");
 		List<Map.Entry<String, Double>> logprobs = analyzer.NBPosNegProb();
 		DocAnalyzer.OutputWordCount2(logprobs, "probs.txt");
-//		double a = 1.0;
-//		logprobs = SortHashMap_double(logprobs);
 		
+		
+//		DocAnalyzer.OutputWordCount2(result, "NBclassResult.txt");
+		System.out.println("NB classfying...");
+		
+		List<Map.Entry<Double, double[]>> PRs = analyzer.multipleDeltaPR();
+		DocAnalyzer.OutputPRList(PRs, "PRresults.csv");
+		
+		//Task 3.Random projection for KNN
+		
+		
+		//Task 4.Cross Validation
+		
+		double[] CVresults = analyzer.CrossValidation();
+		
+		
+		
+		
+		System.out.println("Done!");
 	}
 
 }

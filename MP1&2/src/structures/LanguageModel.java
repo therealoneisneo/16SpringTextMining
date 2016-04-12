@@ -20,7 +20,7 @@ public class LanguageModel {
 	double m_delta; // parameter for absolute discount smoothing
 	double m_totalcount;// parameter to count the total word count in this corpus.
 	Set<String> m_uniSet;// the set holds all unigram keys for the bigram generation purpose.
-	
+	int m_doc_num;// the number of documents used for this language Model
 	
 	
 	public LanguageModel(int N) {
@@ -31,6 +31,16 @@ public class LanguageModel {
 		m_bigrams = new HashMap<String, HashMap<String, Double>>();
 		m_lambda = 0.9;
 		m_delta = 0.1;
+		m_doc_num = 0;
+	}
+	
+	public int getDocNum()
+	{
+		return m_doc_num;
+	}
+	public void IncreDocNum(int i)
+	{
+		m_doc_num += i;
 	}
 	
 	public int getGramNum()
