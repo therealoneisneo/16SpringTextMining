@@ -56,7 +56,8 @@ public class DocAnalyzer {
 //	ArrayList<Post> m_Test_reviews;
 	ArrayList<Post> m_reviews;
 	ArrayList<Post> m_Qreviews;
-	
+	HashMap<List<Integer>, List<Post>> m_buckets; // the buckets for the random projection result in KNN
+	ArrayList<HashMap<String, Double>> m_randvec;// the random vectors for the hash purpose in the bucket in KNN
 	//you might need something like this to store the counting statistics for validating Zipf's and computing IDF
 	HashMap<String, Token> m_stats;	
 	HashMap<String, Token> m_dfstats; // the count for df
@@ -856,7 +857,6 @@ public class DocAnalyzer {
 		return m_tokenizer.tokenize(text);
 	}
 
-
 	public static List<Map.Entry<String, Token>> SortHashMap(HashMap<String, Token> m_stats)
 	{
 		List<Map.Entry<String, Token>> entrylist = new ArrayList<Map.Entry<String, Token>>(m_stats.entrySet());
@@ -976,25 +976,25 @@ public class DocAnalyzer {
 		}
 	}
 	
-	public void TF_IDFCalc2(Post review, HashMap<String, Double> DFs, int DocNum) // calc TFIDF for the KNN vector
-	{
-		List<String> CtrlVoc = new ArrayList<String>(m_CtrlVocabulary);
-		int size = CtrlVoc.size();
-		for (int i = 0; i < size; i++)
-		{
-			double tf = review.getTvecValue(i);
-			if (tf > 0)
-			{
-				tf = 1 + Math.log10(tf);
-				String tk = CtrlVoc.get(i);
-				System.out.println(tk);
-//				Token testtoken = DF.get(tk);
-				double idf = DFs.get(CtrlVoc.get(i));
-				idf = 1 + Math.log10((double)DocNum/idf);
-				review.setTvecValue(i, tf * idf);
-			}
-		}
-	}
+//	public void TF_IDFCalc2(Post review, HashMap<String, Double> DFs, int DocNum) // calc TFIDF for the KNN vector
+//	{
+//		List<String> CtrlVoc = new ArrayList<String>(m_CtrlVocabulary);
+//		int size = CtrlVoc.size();
+//		for (int i = 0; i < size; i++)
+//		{
+//			double tf = review.getTvecValue(i);
+//			if (tf > 0)
+//			{
+//				tf = 1 + Math.log10(tf);
+//				String tk = CtrlVoc.get(i);
+//				System.out.println(tk);
+////				Token testtoken = DF.get(tk);
+//				double idf = DFs.get(CtrlVoc.get(i));
+//				idf = 1 + Math.log10((double)DocNum/idf);
+//				review.setTvecValue(i, tf * idf);
+//			}
+//		}
+//	}
 	
 	
 	
@@ -1227,36 +1227,37 @@ public class DocAnalyzer {
 		m_reviews = temp;
 	}
 	
-	public void BuildSparseVec2()//build the sparse vecter representation for KNN use, all the value should be the TF-IDF double value
+	public void BuildSparseVec2()//build the sparse vecter representation for KNN use, all the value are transformed to TF-IDF double value
 	{
-		ArrayList<Post> temp = new ArrayList<Post>();
+//		ArrayList<Post> temp = new ArrayList<Post>();
 		for (int i = 0; i < m_reviews.size(); i++)
 		{
-			m_reviews.get(i).initSparseVec();
-			String[] tokens = m_reviews.get(i).getTokens();
-			for (String tok : tokens)
+			HashMap<String, Double> tempvec = new HashMap<String, Double>(m_reviews.get(i).getVct());
+			for (Map.Entry<String, Double> entry : tempvec.entrySet())
 			{
-				tok = SnowballStemming(Normalization(tok));
-				if (m_CtrlVocabulary.contains(tok))	
-				{
-//					m_reviews.get(i).SetVct(tok, );
-				}
-					
+				String term = entry.getKey();
+				double tf = entry.getValue();
+				tf = 1 + Math.log10(tf);
+				
+//				String tk = CtrlVoc.get(i);
+//				System.out.println(tk);
+//				Token testtoken = DF.get(tk);
+				double idf = m_dfstats.get(term).getValue();
+				idf = 1 + Math.log10((double)DocNum/idf);
+				m_reviews.get(i).SetVct(term, tf * idf);
+//				review.setTvecValue(i, tf * idf);
 			}
-			if (m_reviews.get(i).getVct().size() > 5)//eliminate the reviews with less than 5 non-empty entry in the vec representation.
-				temp.add(m_reviews.get(i));
 		}
-		
-		m_reviews = temp;
 	}
 	
-	public double SparceVecDot(HashMap<String, Double> v1, HashMap<String, Double> v2)
+	public double SparseVecDot(HashMap<String, Double> v1, HashMap<String, Double> v2)
 	{
 		double result = 0.0;
 		for(Map.Entry<String, Double> entry : v1.entrySet())
 		{
 			if (v2.containsKey(entry.getKey()))
-				result += entry.getValue() * v2.get(entry.getKey());
+//				result += entry.getValue() * v2.get(entry.getKey()).;
+				result += entry.getValue() * v2.get(entry.getKey()).doubleValue();
 		}
 		return result;
 	}
@@ -1355,7 +1356,7 @@ public class DocAnalyzer {
 		return pr;
 	}
 	
-	public List<Map.Entry<Double, double[]>> multipleDeltaPR()
+	public List<Map.Entry<Double, double[]>> multipleDeltaPR() //test of the multiple delta values in the NB classification
 	{
 		HashMap<String, Integer> classtruth = getDocNegPos();
 		List<Map.Entry<Double, double[]>> PRs = new ArrayList<Map.Entry<Double, double[]>>();
@@ -1370,6 +1371,69 @@ public class DocAnalyzer {
 		}
 		return PRs;
 	}
+	
+	
+	public void BuildRandProjBucket(int l)// perform random projection and build buckets for all reviews
+	{
+		Random rnd = new Random(42);
+		m_buckets = new HashMap<List<Integer>, List<Post>>();
+		m_randvec = new ArrayList<HashMap<String, Double>>(); // random vector
+		for (int i = 0; i < l; i ++)
+		{
+			HashMap<String, Double> tempvec = new HashMap<String, Double>();
+			for(String term : m_CtrlVocabulary)
+			{
+				tempvec.put(term, (rnd.nextDouble() * 2) - 1);
+			}
+			m_randvec.add(tempvec);
+		}
+		for (int i = 0; i < m_reviews.size(); i++)
+		{
+			List<Integer> temphash = new ArrayList<Integer>();
+			for (int j = 0; j < m_randvec.size(); j++)
+			{
+				if(SparseVecDot(m_reviews.get(i).getVct(), m_randvec.get(j)) > 0)
+					temphash.add(1);
+				else
+					temphash.add(0);
+			}
+			
+			if (m_buckets.containsKey(temphash))
+				m_buckets.get(temphash).add(m_reviews.get(i));
+			else
+			{
+				List<Post> tempPostlist = new ArrayList<Post>();
+				tempPostlist.add(m_reviews.get(i));
+				m_buckets.put(temphash, tempPostlist);
+			}
+		}
+	}
+	
+//	
+	public List<String> KNNbruteforce(int k, Post target)// using brute force to retrieve the k nearest reviews ID
+	{
+		HashMap<String, HashMap<String, Double>> results = new HashMap<String, HashMap<String, Double>>();
+	}
+	
+	
+	public List<String> KNNRandProj(int k, Post target)// using random projection to retrieve the k nearest reviews ID
+	{
+		
+	}
+	
+//	public boolean ListEqual(List<Integer> l1, List<Integer> l2) // compare if two list are equal
+//	{
+//		if (l1.size() != l2.size())
+//			return false;
+//		for (int i = 0; i < l1.size(); i++)
+//		{
+//			if (l1.get(i) != l2.get(i))
+//				return false;
+//		}
+//		return true;
+//	}
+//	
+//	
 	
 	public double[] CrossValidation() // 10 fold CV for NB and KNN
 	{
@@ -1539,23 +1603,27 @@ public class DocAnalyzer {
 		System.out.println("Building Sparse Vectors...");
 		analyzer.BuildSparseVec();
 		
-		System.out.println("Creating language Models...");
-		analyzer.createPosNegLanguageModel();
-		
-		System.out.println("Calculating neg and pos probs...");
-		List<Map.Entry<String, Double>> logprobs = analyzer.NBPosNegProb();
-		DocAnalyzer.OutputWordCount2(logprobs, "probs.txt");
-		
-		
-//		DocAnalyzer.OutputWordCount2(result, "NBclassResult.txt");
-		System.out.println("NB classfying...");
-		
-		List<Map.Entry<Double, double[]>> PRs = analyzer.multipleDeltaPR();
-		DocAnalyzer.OutputPRList(PRs, "PRresults.csv");
+//		System.out.println("Creating language Models...");
+//		analyzer.createPosNegLanguageModel();
+//		
+//		System.out.println("Calculating neg and pos probs...");
+//		List<Map.Entry<String, Double>> logprobs = analyzer.NBPosNegProb();
+//		DocAnalyzer.OutputWordCount2(logprobs, "probs.txt");
+//		
+//		
+////		DocAnalyzer.OutputWordCount2(result, "NBclassResult.txt");
+//		System.out.println("NB classfying...");
+//		
+//		List<Map.Entry<Double, double[]>> PRs = analyzer.multipleDeltaPR();
+//		DocAnalyzer.OutputPRList(PRs, "PRresults.csv");
 		
 		//Task 3.Random projection for KNN
 		// get all vector representation of a review. calc tfidf for all words
 		
+		System.out.println("building tf idf Sparse Vectors...");
+		analyzer.BuildSparseVec2();
+		System.out.println("building random projection buckets...");
+		analyzer.BuildRandProjBucket(5);
 		
 		
 		
