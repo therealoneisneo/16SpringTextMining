@@ -132,6 +132,11 @@ public class Post {
 		return m_vector;
 	}
 	
+	public void SetVct(String term, double value)
+	{
+		m_vector.put(term, value);
+	}
+	
 	public void AddVct(String term) {
 		if(m_vector.containsKey(term))
 		{

@@ -297,12 +297,7 @@ public class DocAnalyzer {
 			for (Map.Entry<Double, double[]> entry : PRs)
 			{
 				out.write(String.valueOf(entry.getKey()) + ',' + String.valueOf(entry.getValue()[0]) + ',' + String.valueOf(entry.getValue()[1]) + "\r\n");
-//				out.write(',');
-//				out.write(entry.getValue()[0]);
-//				out.write(',');
-//				out.write(entry.getValue()[1];
-//				out.write();
-////				+ ',' + entry.getValue()[0] + ',' + entry.getValue()[1] + );
+//				
 			}
 			out.flush();
 			out.close(); 
@@ -454,7 +449,57 @@ public class DocAnalyzer {
 	}
 	
 	
-	
+	public void analyzeCtrlDocuments() // analyze the tf and df within all selected reviews, stored in m_stats and m_dfstats
+	{		
+		HashSet<String> dfcheck;
+		dfcheck = new HashSet<String>();
+		m_stats.clear();
+		m_dfstats.clear();
+		for(int i=0; i<m_reviews.size(); i++) 
+		{
+			Post review = m_reviews.get(i);
+			String[] tokens = review.getTokens();
+
+
+			dfcheck.clear();
+			
+			for (String tok : tokens)
+			{
+				tok = SnowballStemming(Normalization(tok));
+				if (m_CtrlVocabulary.contains(tok))
+				{
+					dfcheck.add(tok);
+					if (m_stats.containsKey(tok))
+					{
+						Token temp = m_stats.get(tok);
+						temp.setValue(temp.getValue() + 1); // increase count by 1
+					}
+					else
+					{
+						Token newt = new Token(m_stats.size(), tok);
+						newt.setValue(1); 
+						newt.setPosNeg(review.getRating());
+						m_stats.put(tok, newt);
+					}
+				}	
+			}
+			
+			for (String tok : dfcheck)
+			{
+				if (m_dfstats.containsKey(tok))
+				{
+					Token temp = m_dfstats.get(tok);
+					temp.setValue(temp.getValue() + 1); // increase count by 1
+				}
+				else
+				{
+					Token newt = new Token(m_dfstats.size(), tok);
+					newt.setValue(1); 
+					m_dfstats.put(tok, newt);
+				}
+			}
+		}
+	}
 	
 	//Load the query.json
 //	public void analyzeQurey(JSONObject json) {		
@@ -931,6 +976,26 @@ public class DocAnalyzer {
 		}
 	}
 	
+	public void TF_IDFCalc2(Post review, HashMap<String, Double> DFs, int DocNum) // calc TFIDF for the KNN vector
+	{
+		List<String> CtrlVoc = new ArrayList<String>(m_CtrlVocabulary);
+		int size = CtrlVoc.size();
+		for (int i = 0; i < size; i++)
+		{
+			double tf = review.getTvecValue(i);
+			if (tf > 0)
+			{
+				tf = 1 + Math.log10(tf);
+				String tk = CtrlVoc.get(i);
+				System.out.println(tk);
+//				Token testtoken = DF.get(tk);
+				double idf = DFs.get(CtrlVoc.get(i));
+				idf = 1 + Math.log10((double)DocNum/idf);
+				review.setTvecValue(i, tf * idf);
+			}
+		}
+	}
+	
 	
 	
 	
@@ -1152,6 +1217,29 @@ public class DocAnalyzer {
 				if (m_CtrlVocabulary.contains(tok))	
 				{
 					m_reviews.get(i).AddVct(tok);
+				}
+					
+			}
+			if (m_reviews.get(i).getVct().size() > 5)//eliminate the reviews with less than 5 non-empty entry in the vec representation.
+				temp.add(m_reviews.get(i));
+		}
+		
+		m_reviews = temp;
+	}
+	
+	public void BuildSparseVec2()//build the sparse vecter representation for KNN use, all the value should be the TF-IDF double value
+	{
+		ArrayList<Post> temp = new ArrayList<Post>();
+		for (int i = 0; i < m_reviews.size(); i++)
+		{
+			m_reviews.get(i).initSparseVec();
+			String[] tokens = m_reviews.get(i).getTokens();
+			for (String tok : tokens)
+			{
+				tok = SnowballStemming(Normalization(tok));
+				if (m_CtrlVocabulary.contains(tok))	
+				{
+//					m_reviews.get(i).SetVct(tok, );
 				}
 					
 			}
@@ -1466,6 +1554,10 @@ public class DocAnalyzer {
 		DocAnalyzer.OutputPRList(PRs, "PRresults.csv");
 		
 		//Task 3.Random projection for KNN
+		// get all vector representation of a review. calc tfidf for all words
+		
+		
+		
 		
 		
 		//Task 4.Cross Validation
