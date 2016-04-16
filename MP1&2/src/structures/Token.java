@@ -50,7 +50,7 @@ public class Token {
 	public Token(int id, String token) {
 		m_token = token;
 		m_id = id;
-		m_value = 0;		
+		m_value = 0;
 	}
 	
 	public void setPosNeg(double score)

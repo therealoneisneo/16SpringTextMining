@@ -708,14 +708,14 @@ public class DocAnalyzer {
 		}
 	}
 	
-	public void createPosNegLanguageModel() // create 2 language models based on Pos and Neg reveiws
+	public void createPosNegLanguageModel(List<Post> reviews) // create 2 language models based on Pos and Neg reveiws
 	{
 		m_PoslangModel = new LanguageModel(m_N);
 		m_NeglangModel = new LanguageModel(m_N);
 		int count = 0;
 		if (m_N == 1)// unigram model, calculate all terms
 		{
-			for(Post review : m_reviews) 
+			for(Post review : reviews) 
 			{	
 				System.out.println("Language model : " + count);
 				count += 1;
@@ -1224,6 +1224,18 @@ public class DocAnalyzer {
 				temp.add(m_reviews.get(i));
 		}
 		
+		
+		for (int i = 0; i < m_Qreviews.size(); i++)//process query reviews
+		{
+			m_Qreviews.get(i).initSparseVec();
+			String[] tokens = m_Qreviews.get(i).getTokens();
+			for (String tok : tokens)
+			{
+				tok = SnowballStemming(Normalization(tok));
+				if (m_CtrlVocabulary.contains(tok))	
+					m_Qreviews.get(i).AddVct(tok);
+			}
+		}
 		m_reviews = temp;
 	}
 	
@@ -1248,6 +1260,27 @@ public class DocAnalyzer {
 //				review.setTvecValue(i, tf * idf);
 			}
 		}
+		
+		for (int i = 0; i < m_Qreviews.size(); i++)//process query reviews
+		{
+			HashMap<String, Double> tempvec = new HashMap<String, Double>(m_Qreviews.get(i).getVct());
+			for (Map.Entry<String, Double> entry : tempvec.entrySet())
+			{
+				String term = entry.getKey();
+				double tf = entry.getValue();
+				tf = 1 + Math.log10(tf);
+				
+//				String tk = CtrlVoc.get(i);
+//				System.out.println(tk);
+//				Token testtoken = DF.get(tk);
+				double idf = m_dfstats.get(term).getValue();
+				idf = 1 + Math.log10((double)DocNum/idf);
+				m_Qreviews.get(i).SetVct(term, tf * idf);
+//				review.setTvecValue(i, tf * idf);
+			}
+		}
+		
+		
 	}
 	
 	public double SparseVecDot(HashMap<String, Double> v1, HashMap<String, Double> v2)
@@ -1371,7 +1404,7 @@ public class DocAnalyzer {
 		}
 		return PRs;
 	}
-	
+	 
 	
 	public void BuildRandProjBucket(int l)// perform random projection and build buckets for all reviews
 	{
@@ -1409,16 +1442,75 @@ public class DocAnalyzer {
 		}
 	}
 	
-//	
-	public List<String> KNNbruteforce(int k, Post target)// using brute force to retrieve the k nearest reviews ID
+	
+	public void TopResults(int k, HashMap<String, Double> results, double sim, String ID)
 	{
-		HashMap<String, HashMap<String, Double>> results = new HashMap<String, HashMap<String, Double>>();
+		if (results.size() < k)
+			results.put(ID, sim);
+		else
+		{
+			double min_sim = 10000000;
+			String min_ID = ""; 
+			for (Map.Entry<String, Double> entry : results.entrySet())
+			{
+				if (entry.getValue() < min_sim)
+				{
+					min_sim = entry.getValue();
+					min_ID = entry.getKey();
+				}
+			}
+			if (sim > min_sim)
+			{
+				results.remove(min_ID);
+				results.put(ID, sim);
+			}
+		}
+	}
+	
+//	
+	public List<String> KNNbruteforce(int k, Post target)// using brute force to retrieve the k nearest reviews ID, input a target Post review, return a list of similar reveiw IDs
+	{
+//		HashMap<String, HashMap<String, Double>> results = new HashMap<String, HashMap<String, Double>>();
+		HashMap<String, Double> results = new HashMap<String, Double>();
+		for (int i = 0; i < m_reviews.size(); i++)
+		{
+			double similarity = SparseVecDot(m_reviews.get(i).getVct(), target.getVct());
+			TopResults(k, results, similarity, target.getID());
+		}
+		List<String> top = new ArrayList<String>();
+		for (Map.Entry<String, Double> entry : results.entrySet())
+			top.add(entry.getKey());
+		return top;
 	}
 	
 	
 	public List<String> KNNRandProj(int k, Post target)// using random projection to retrieve the k nearest reviews ID
 	{
+		HashMap<String, Double> results = new HashMap<String, Double>();
+		List<Integer> temphash = new ArrayList<Integer>();
+		for (int j = 0; j < m_randvec.size(); j++)
+		{
+			if(SparseVecDot(target.getVct(), m_randvec.get(j)) > 0)
+				temphash.add(1);
+			else
+				temphash.add(0);
+		}
 		
+		if (m_buckets.containsKey(temphash))
+		{
+			List<Post> reviews = m_buckets.get(temphash);
+			for (int i = 0; i < reviews.size(); i++)
+			{
+				double similarity = SparseVecDot(reviews.get(i).getVct(), target.getVct());
+				TopResults(k, results, similarity, target.getID());
+			}
+			List<String> top = new ArrayList<String>();
+			for (Map.Entry<String, Double> entry : results.entrySet())
+				top.add(entry.getKey());
+			return top;
+		}
+		else
+			return KNNbruteforce(k, target);
 	}
 	
 //	public boolean ListEqual(List<Integer> l1, List<Integer> l2) // compare if two list are equal
@@ -1435,10 +1527,42 @@ public class DocAnalyzer {
 //	
 //	
 	
-	public double[] CrossValidation() // 10 fold CV for NB and KNN
+	public double[] CrossValidation(int fold) // 10 fold CV for NB and KNN
 	{
 		double[] results = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // first 3 are NBs P,R,F average, Last 3 are KNN's P,R,F average
 		Collections.shuffle(m_reviews);
+		int offset = m_reviews.size() / fold;
+		for (int i = 0; i < fold; i++)
+		{
+			List<Post> train = new ArrayList<Post>();
+			List<Post> test = new ArrayList<Post>();
+			if (i == fold - 1) // the last fold
+			{
+				for (int j = 0; j < m_reviews.size(); j++)
+				{
+					if (j >= i * offset)
+						test.add(m_reviews.get(j));
+					else
+						train.add(m_reviews.get(j));
+				}
+			}
+			else
+			{
+				
+				for (int j = 0; j < m_reviews.size(); j++)
+				{
+					if (j >= i * offset && j < (i + 1) * offset)
+						test.add(m_reviews.get(j));
+					else
+						train.add(m_reviews.get(j));
+				}
+			}
+			
+			// perform NB and KNN here
+			
+			
+		}
+		
 		return results;
 	}
 	
@@ -1599,12 +1723,12 @@ public class DocAnalyzer {
 		
 		// feature selection complete
 		analyzer.LoadVocabulary("CtrlVocabulary.txt");
-		
+		analyzer.LoadQurey("./Data/samples/query.json");
 		System.out.println("Building Sparse Vectors...");
 		analyzer.BuildSparseVec();
 		
 //		System.out.println("Creating language Models...");
-//		analyzer.createPosNegLanguageModel();
+//		analyzer.createPosNegLanguageModel(m_reviews);
 //		
 //		System.out.println("Calculating neg and pos probs...");
 //		List<Map.Entry<String, Double>> logprobs = analyzer.NBPosNegProb();
@@ -1624,13 +1748,13 @@ public class DocAnalyzer {
 		analyzer.BuildSparseVec2();
 		System.out.println("building random projection buckets...");
 		analyzer.BuildRandProjBucket(5);
-		
+		//do the Knn here
 		
 		
 		
 		//Task 4.Cross Validation
 		
-		double[] CVresults = analyzer.CrossValidation();
+		double[] CVresults = analyzer.CrossValidation(10);
 		
 		
 		
