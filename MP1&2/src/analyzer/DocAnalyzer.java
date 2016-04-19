@@ -61,7 +61,9 @@ public class DocAnalyzer {
 	//you might need something like this to store the counting statistics for validating Zipf's and computing IDF
 	HashMap<String, Token> m_stats;	
 	HashMap<String, Token> m_dfstats; // the count for df
-
+	
+	HashMap<String, Integer> m_ID_Index_map; // hash map mapping review id and the index in m_reviews
+	HashMap<String, Integer> m_classtruth;// the review true pos and neg
 	//we have also provided a sample implementation of language model in src.structures.LanguageModel
 	Tokenizer m_tokenizer;
 	
@@ -81,6 +83,8 @@ public class DocAnalyzer {
 		m_tokenizer = new TokenizerME(new TokenizerModel(new FileInputStream(tokenModel)));
 		m_stopwords = new HashSet<String>();
 		m_CtrlVocabulary = new HashSet<String>();
+		m_train_num = -1;
+		m_test_num = -1;
 	}
 	
 	//sample code for loading a list of stopwords from file
@@ -469,6 +473,8 @@ public class DocAnalyzer {
 				tok = SnowballStemming(Normalization(tok));
 				if (m_CtrlVocabulary.contains(tok))
 				{
+					if(tok == "babareeba")
+						System.out.println(tok);
 					dfcheck.add(tok);
 					if (m_stats.containsKey(tok))
 					{
@@ -487,6 +493,8 @@ public class DocAnalyzer {
 			
 			for (String tok : dfcheck)
 			{
+				if(tok == "babareeba")
+					System.out.println(tok);
 				if (m_dfstats.containsKey(tok))
 				{
 					Token temp = m_dfstats.get(tok);
@@ -516,6 +524,62 @@ public class DocAnalyzer {
 				review.setTokens(tokens);
 				m_Qreviews.add(review);
 			}
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+	public void LoadQurey2(String Filename) // load qurey and also build the tfidf vec for the query
+	{		
+		try {
+			File f = new File(Filename);
+			JSONObject json = LoadJson(f.getAbsolutePath());
+			JSONArray jarray = json.getJSONArray("Reviews");
+			m_Qreviews.clear();
+	
+			for(int i=0; i<jarray.length(); i++) 
+			{
+				Post review = new Post(jarray.getJSONObject(i));
+				String[] tokens = Tokenize(review.getContent());
+				review.setTokens(tokens);
+				m_Qreviews.add(review);
+			}
+			
+			HashSet<String> dfcheck = new HashSet<String>();
+			HashMap<String, Token> dfstats = new HashMap<String, Token>();
+			for(int i=0; i<m_Qreviews.size(); i++) 
+			{
+				Post review = m_Qreviews.get(i);
+				String[] tokens = review.getTokens();
+
+
+				dfcheck.clear();
+				
+				for (String tok : tokens)
+				{
+					tok = SnowballStemming(Normalization(tok));
+					if (m_CtrlVocabulary.contains(tok))
+						dfcheck.add(tok);
+				}
+				
+				for (String tok : dfcheck)
+				{
+					if (dfstats.containsKey(tok))
+					{
+						Token temp = dfstats.get(tok);
+						temp.setValue(temp.getValue() + 1); // increase count by 1
+					}
+					else
+					{
+						Token newt = new Token(dfstats.size(), tok);
+						newt.setValue(1); 
+						dfstats.put(tok, newt);
+					}
+				}
+			}
+			
+			
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
@@ -710,15 +774,16 @@ public class DocAnalyzer {
 	
 	public void createPosNegLanguageModel(List<Post> reviews) // create 2 language models based on Pos and Neg reveiws
 	{
+		if (reviews == null)
+			reviews = m_reviews;
+		System.out.println("Creating Language model...");
 		m_PoslangModel = new LanguageModel(m_N);
 		m_NeglangModel = new LanguageModel(m_N);
-		int count = 0;
 		if (m_N == 1)// unigram model, calculate all terms
 		{
 			for(Post review : reviews) 
 			{	
-				System.out.println("Language model : " + count);
-				count += 1;
+//				System.out.println("Language model : " + count);
 				String[] tokens = review.getTokens();
 				if (review.getRating() >= 4) // Pos
 				{
@@ -726,7 +791,7 @@ public class DocAnalyzer {
 					for (String tok : tokens)
 					{
 						tok = SnowballStemming(Normalization(tok));
-						if (tok.length() > 0)
+						if (m_CtrlVocabulary.contains(tok))
 						{
 							m_PoslangModel.increCount(); 
 							m_PoslangModel.addToken(tok); // add token to the m_model
@@ -1237,50 +1302,64 @@ public class DocAnalyzer {
 			}
 		}
 		m_reviews = temp;
+		System.out.println("The final number of selected reviews is : " + m_reviews.size());
+		// build ID and index mapping in m_reviews
+		m_ID_Index_map = new HashMap<String, Integer>();
+		for (int i = 0; i < m_reviews.size(); i++)
+		{
+			m_ID_Index_map.put(m_reviews.get(i).getID(), i);
+		}
 	}
 	
-	public void BuildSparseVec2()//build the sparse vecter representation for KNN use, all the value are transformed to TF-IDF double value
+	public void BuildSparseVec2()//build the sparse vecter representation for KNN use, all the value are transformed to TF-IDF double value and stored in m_tfidf_vector
 	{
+		
 //		ArrayList<Post> temp = new ArrayList<Post>();
 		for (int i = 0; i < m_reviews.size(); i++)
 		{
+			m_reviews.get(i).init_tfidf_SparseVec();
 			HashMap<String, Double> tempvec = new HashMap<String, Double>(m_reviews.get(i).getVct());
 			for (Map.Entry<String, Double> entry : tempvec.entrySet())
 			{
 				String term = entry.getKey();
 				double tf = entry.getValue();
 				tf = 1 + Math.log10(tf);
-				
+				  
 //				String tk = CtrlVoc.get(i);
 //				System.out.println(tk);
 //				Token testtoken = DF.get(tk);
 				double idf = m_dfstats.get(term).getValue();
-				idf = 1 + Math.log10((double)DocNum/idf);
-				m_reviews.get(i).SetVct(term, tf * idf);
+				idf = 1 + Math.log10((double)(m_reviews.size())/idf);
+				m_reviews.get(i).Set_tfidf_Vct(term, tf * idf);
 //				review.setTvecValue(i, tf * idf);
 			}
 		}
 		
 		for (int i = 0; i < m_Qreviews.size(); i++)//process query reviews
 		{
+			m_Qreviews.get(i).init_tfidf_SparseVec();
 			HashMap<String, Double> tempvec = new HashMap<String, Double>(m_Qreviews.get(i).getVct());
 			for (Map.Entry<String, Double> entry : tempvec.entrySet())
 			{
 				String term = entry.getKey();
-				double tf = entry.getValue();
-				tf = 1 + Math.log10(tf);
-				
-//				String tk = CtrlVoc.get(i);
-//				System.out.println(tk);
-//				Token testtoken = DF.get(tk);
-				double idf = m_dfstats.get(term).getValue();
-				idf = 1 + Math.log10((double)DocNum/idf);
-				m_Qreviews.get(i).SetVct(term, tf * idf);
-//				review.setTvecValue(i, tf * idf);
+				if (m_CtrlVocabulary.contains(term))
+				{
+					double tf = entry.getValue();
+					tf = 1 + Math.log10(tf);
+					
+//					String tk = CtrlVoc.get(i);
+//					System.out.println(tk);
+//					Token testtoken = DF.get(tk);
+					if(m_dfstats.get(term) == null)
+						System.out.println(term);
+					
+					double idf = m_dfstats.get(term).getValue();
+					idf = 1 + Math.log10((double)(m_reviews.size())/idf);
+					m_Qreviews.get(i).Set_tfidf_Vct(term, tf * idf);
+//					review.setTvecValue(i, tf * idf);
+				}
 			}
 		}
-		
-		
 	}
 	
 	public double SparseVecDot(HashMap<String, Double> v1, HashMap<String, Double> v2)
@@ -1302,23 +1381,35 @@ public class DocAnalyzer {
 		m_PoslangModel.setDelta(0.1);
 		m_NeglangModel.setDelta(0.1);
 		int count = 0;
-		for (int i = 0; i < m_reviews.size(); i++)
+//		for (int i = 0; i < m_reviews.size(); i++)
+//		{
+//			System.out.println(" PosNeg calc : " + count);
+//			count += 1;
+//			String[] tokens = m_reviews.get(i).getTokens();
+//			for (String tok : tokens)
+//			{
+//				tok = SnowballStemming(Normalization(tok));
+//				if(tok.length() > 0)
+//				{
+//					posP = m_PoslangModel.calcAddSmoothedProb(tok);
+//					negP = m_NeglangModel.calcAddSmoothedProb(tok);
+//					prob.put(tok, Math.log(posP / negP));
+//				}
+//				
+//			}
+//		}
+		
+		for (String tok : m_CtrlVocabulary)
 		{
-			System.out.println(" PosNeg calc : " + count);
-			count += 1;
-			String[] tokens = m_reviews.get(i).getTokens();
-			for (String tok : tokens)
+			tok = SnowballStemming(Normalization(tok));
+			if(tok.length() > 0)
 			{
-				tok = SnowballStemming(Normalization(tok));
-				if(tok.length() > 0)
-				{
-					posP = m_PoslangModel.calcAddSmoothedProb(tok);
-					negP = m_NeglangModel.calcAddSmoothedProb(tok);
-					prob.put(tok, Math.log(posP / negP));
-				}
-				
+				posP = m_PoslangModel.calcAddSmoothedProb(tok);
+				negP = m_NeglangModel.calcAddSmoothedProb(tok);
+				prob.put(tok, Math.log(posP / negP));
 			}
 		}
+		
 //		List<Map.Entry<String, Double>> sorted = new ArrayList<Map.Entry<String, Double>>();
 		return DocAnalyzer.SortHashMap_double(prob);
 	}
@@ -1336,11 +1427,11 @@ public class DocAnalyzer {
 		return result;
 	}
 //	HashMap<Integer, Double> score
-	public List<Map.Entry<String, Double>> NaiveBayesClassifyer()
+	public List<Map.Entry<String, Double>> NaiveBayesClassifyer(List<Post> reviews)
 	{
 		HashMap<String, Double> scores = new HashMap<String, Double>();
-		for (int i = 0; i < m_reviews.size(); i++)
-			scores.put(m_reviews.get(i).getID(), NaiveBayesScore(m_reviews.get(i)));
+		for (int i = 0; i < reviews.size(); i++)
+			scores.put(reviews.get(i).getID(), NaiveBayesScore(reviews.get(i)));
 		return SortHashMap_double(scores);
 	}
 	
@@ -1359,12 +1450,12 @@ public class DocAnalyzer {
 	
 	public double[] CalcPR(List<Map.Entry<String, Double>> predict, HashMap<String, Integer> truth)// precision and recall score
 	{
-		double[] pr = {0.0, 0.0};
-		int TP,FP,TN,FN;
+		double[] pr = {0.0, 0.0}; // [0] p [1]  r
+		int TP,FP,FN;//TN,
 		String id;
 		TP = 0;
 		FP = 0;
-		TN = 0;
+//		TN = 0;
 		FN = 0;
 		for(int i = 0; i < predict.size(); i++)
 		{
@@ -1380,8 +1471,8 @@ public class DocAnalyzer {
 			{
 				if (truth.get(id).intValue() > 0)
 					FN += 1;
-				else
-					TN += 1;
+//				else
+//					TN += 1;
 			}
 		}
 		pr[0] = (double)TP / (TP + FP);
@@ -1393,13 +1484,13 @@ public class DocAnalyzer {
 	{
 		HashMap<String, Integer> classtruth = getDocNegPos();
 		List<Map.Entry<Double, double[]>> PRs = new ArrayList<Map.Entry<Double, double[]>>();
-		for (double i = 1; i < 20; i = i + 2)
+		for (double i = 1; i < 20; i = i + 3)
 		{
 			double delta = i / 10;
 			m_NeglangModel.setDelta(delta);
 			m_PoslangModel.setDelta(delta);
-			List<Map.Entry<String, Double>> NBresult = NaiveBayesClassifyer();
-			double[] pr = CalcPR(NBresult, classtruth); 
+			List<Map.Entry<String, Double>> NBresult = NaiveBayesClassifyer(m_reviews);
+			double[] pr = CalcPR(NBresult, classtruth);
 			PRs.add(new AbstractMap.SimpleEntry<Double, double[]>(delta, pr.clone()));
 		}
 		return PRs;
@@ -1443,7 +1534,7 @@ public class DocAnalyzer {
 	}
 	
 	
-	public void TopResults(int k, HashMap<String, Double> results, double sim, String ID)
+	public void TopResults(int k, HashMap<String, Double> results, double sim, String ID) // when new sim and review index come in, maintain the "results" have the highest k reviews
 	{
 		if (results.size() < k)
 			results.put(ID, sim);
@@ -1466,7 +1557,52 @@ public class DocAnalyzer {
 			}
 		}
 	}
-	
+	public List<Map.Entry<String, Double>> KNNClassifyer(int k, List<Post> train, List<Post> test)
+	{
+		List<Map.Entry<String,Double>> scores = new ArrayList<Map.Entry<String,Double>>();
+		for (int ti = 0; ti < test.size(); ti++)
+		{
+			HashMap<String, Double> results = new HashMap<String, Double>();
+			List<Integer> temphash = new ArrayList<Integer>();
+			for (int j = 0; j < m_randvec.size(); j++)
+			{
+				if(SparseVecDot(test.get(ti).get_tfidf_Vct(), m_randvec.get(j)) > 0)
+					temphash.add(1);
+				else
+					temphash.add(0);
+			}
+			
+			if (m_buckets.containsKey(temphash))
+			{
+				List<Post> reviews = m_buckets.get(temphash);
+				for (int i = 0; i < reviews.size(); i++)
+				{
+					double similarity = SparseVecDot(reviews.get(i).get_tfidf_Vct(), test.get(ti).get_tfidf_Vct());
+					TopResults(k, results, similarity, reviews.get(i).getID());
+				}
+				
+				int pos = 0;
+				int neg = 0;
+				for (Map.Entry<String, Double> entry : results.entrySet())
+				{
+					if(m_reviews.get(m_ID_Index_map.get(entry.getKey())).getRating() > 3)
+						pos += 1;
+					else
+						neg += 1;
+				}
+				if (pos > neg)
+					scores.add(new AbstractMap.SimpleEntry<String, Double>(test.get(ti).getID(), 1.0));
+				else
+					scores.add(new AbstractMap.SimpleEntry<String, Double>(test.get(ti).getID(), -1.0));
+			}
+			else
+			{
+				System.out.println("error: bucket not found");
+//				return KNNbruteforce(k, target);
+			}
+		}
+		return scores;
+	}
 //	
 	public List<String> KNNbruteforce(int k, Post target)// using brute force to retrieve the k nearest reviews ID, input a target Post review, return a list of similar reveiw IDs
 	{
@@ -1474,8 +1610,8 @@ public class DocAnalyzer {
 		HashMap<String, Double> results = new HashMap<String, Double>();
 		for (int i = 0; i < m_reviews.size(); i++)
 		{
-			double similarity = SparseVecDot(m_reviews.get(i).getVct(), target.getVct());
-			TopResults(k, results, similarity, target.getID());
+			double similarity = SparseVecDot(m_reviews.get(i).get_tfidf_Vct(), target.get_tfidf_Vct());
+			TopResults(k, results, similarity, m_reviews.get(i).getID());
 		}
 		List<String> top = new ArrayList<String>();
 		for (Map.Entry<String, Double> entry : results.entrySet())
@@ -1490,7 +1626,7 @@ public class DocAnalyzer {
 		List<Integer> temphash = new ArrayList<Integer>();
 		for (int j = 0; j < m_randvec.size(); j++)
 		{
-			if(SparseVecDot(target.getVct(), m_randvec.get(j)) > 0)
+			if(SparseVecDot(target.get_tfidf_Vct(), m_randvec.get(j)) > 0)
 				temphash.add(1);
 			else
 				temphash.add(0);
@@ -1501,8 +1637,8 @@ public class DocAnalyzer {
 			List<Post> reviews = m_buckets.get(temphash);
 			for (int i = 0; i < reviews.size(); i++)
 			{
-				double similarity = SparseVecDot(reviews.get(i).getVct(), target.getVct());
-				TopResults(k, results, similarity, target.getID());
+				double similarity = SparseVecDot(reviews.get(i).get_tfidf_Vct(), target.get_tfidf_Vct());
+				TopResults(k, results, similarity, m_reviews.get(i).getID());
 			}
 			List<String> top = new ArrayList<String>();
 			for (Map.Entry<String, Double> entry : results.entrySet())
@@ -1510,34 +1646,79 @@ public class DocAnalyzer {
 			return top;
 		}
 		else
+		{
+			System.out.println("bucket not found, using brute force KNN...");
 			return KNNbruteforce(k, target);
+		}
 	}
 	
-//	public boolean ListEqual(List<Integer> l1, List<Integer> l2) // compare if two list are equal
-//	{
-//		if (l1.size() != l2.size())
-//			return false;
-//		for (int i = 0; i < l1.size(); i++)
-//		{
-//			if (l1.get(i) != l2.get(i))
-//				return false;
-//		}
-//		return true;
-//	}
-//	
-//	
+	public void KNNcompilation()
+	{
+//		m_Qreviews.clear();
+//		LoadQurey("./Data/samples/query.json");
+		//timing1
+		List<String> temp;
+		System.out.println("KNN brute force running...");
+		for (int i = 0; i < m_Qreviews.size(); i++)
+		{	
+			long start = System.currentTimeMillis();
+			temp = new ArrayList<String>(KNNbruteforce(5, m_Qreviews.get(i)));
+			long end = System.currentTimeMillis();
+			for (String str : temp)
+			{
+				System.out.println(str);
+			}
+			long costtime = end - start;
+			System.out.println("Time cost : " + costtime);
+		}
+		
+		System.out.println("KNN random projection running...");
+		for (int i = 0; i < m_Qreviews.size(); i++)
+		{	
+			long start = System.currentTimeMillis();
+			temp = new ArrayList<String>(KNNRandProj(5, m_Qreviews.get(i)));
+			long end = System.currentTimeMillis();
+			for (String str : temp)
+			{
+				System.out.println(str);
+			}
+			long costtime = end - start;
+			System.out.println("Time cost : " + costtime);
+		}
+	}
+	
+
+	
+	public double[] NaiveBayesPR(List<Post> train, List<Post> test)// build NB model on train and return the PR on test
+	{
+		createPosNegLanguageModel(train);
+		List<Map.Entry<String, Double>> scores = new ArrayList<Map.Entry<String, Double>>(NaiveBayesClassifyer(test));
+		return CalcPR(scores, m_classtruth);
+	}
+	
+	
+	public double[] KnnPR(List<Post> train, List<Post> test)// using KNN with train and return the PR on test
+	{
+		List<Map.Entry<String, Double>> scores = KNNClassifyer(5, train, test);
+		HashMap<String, Integer> classtruth = getDocNegPos();
+		return CalcPR(scores, classtruth);
+	}
 	
 	public double[] CrossValidation(int fold) // 10 fold CV for NB and KNN
 	{
+		m_classtruth = new HashMap<String, Integer>();
+		m_classtruth = getDocNegPos();
+		System.out.println(fold + " fold Cross Validation: ");
 		double[] results = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // first 3 are NBs P,R,F average, Last 3 are KNN's P,R,F average
 		Collections.shuffle(m_reviews);
 		int offset = m_reviews.size() / fold;
+		
 		for (int i = 0; i < fold; i++)
 		{
+			System.out.println("Fold : " + i + "...");
 			List<Post> train = new ArrayList<Post>();
 			List<Post> test = new ArrayList<Post>();
 			if (i == fold - 1) // the last fold
-			{
 				for (int j = 0; j < m_reviews.size(); j++)
 				{
 					if (j >= i * offset)
@@ -1545,10 +1726,7 @@ public class DocAnalyzer {
 					else
 						train.add(m_reviews.get(j));
 				}
-			}
 			else
-			{
-				
 				for (int j = 0; j < m_reviews.size(); j++)
 				{
 					if (j >= i * offset && j < (i + 1) * offset)
@@ -1556,12 +1734,36 @@ public class DocAnalyzer {
 					else
 						train.add(m_reviews.get(j));
 				}
-			}
+			double[] temp;
+			double f;
+			System.out.println("fold " + i + " results:");
+			temp = NaiveBayesPR(train, test);
+			results[0] += temp[0];
+			results[1] += temp[1];
+			f = 2 * (temp[0] * temp[1]) / (temp[0] + temp[1]);
+			results[2] += f;
+					
+			System.out.println(temp[0]);
+			System.out.println(temp[1]);
+			System.out.println(f);
+			temp = KnnPR(train, test);
+			results[3] += temp[0];
+			results[4] += temp[1];
+			f = 2 * (temp[0] * temp[1]) / (temp[0] + temp[1]);
+			results[5] += f;
+			System.out.println(temp[0]);
+			System.out.println(temp[1]);
+			System.out.println(f);
 			
-			// perform NB and KNN here
 			
 			
 		}
+		results[0] /= fold;
+		results[1] /= fold;
+		results[2] /= fold;
+		results[3] /= fold;
+		results[4] /= fold;
+		results[5] /= fold;
 		
 		return results;
 	}
@@ -1583,8 +1785,8 @@ public class DocAnalyzer {
 		all_DFs = new HashMap<String, Token>();
 		analyzer.LoadStopwords("init_stop_words.txt");
 //		analyzer2.LoadStopwords("init_stop_words.txt");
-		analyzer.LoadDirectory("./Data/yelps/train", ".json");
-		analyzer.LoadDirectory("./Data/yelps/test", ".json"); // in text categorizaiton, loading all json files
+		analyzer.LoadDirectory("./Data/yelp/train", ".json");
+		analyzer.LoadDirectory("./Data/yelp/test", ".json"); // in text categorizaiton, loading all json files
 //		analyzer2.LoadDirectory("./Data/yelp/train", ".json");
 //		
 		all_DFs.putAll(analyzer.m_dfstats);
@@ -1597,10 +1799,10 @@ public class DocAnalyzer {
 		all_TFs.putAll(analyzer.m_stats);
 //		all_TFs.putAll(analyzer2.m_stats);
 //		
-//		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
-//		DocAnalyzer.OutputWordCount(all_tf_sorted, "allTF.txt");
-//		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
-//		DocAnalyzer.OutputWordCount(all_df_sorted, "allDF.txt"); 
+		List<Map.Entry<String, Token>> all_tf_sorted = DocAnalyzer.SortHashMap(all_TFs); // Sort the tokens by DF
+		DocAnalyzer.OutputWordCount(all_tf_sorted, "allTF.txt");
+		List<Map.Entry<String, Token>> all_df_sorted = DocAnalyzer.SortHashMap(all_DFs); // Sort the tokens by DF
+		DocAnalyzer.OutputWordCount(all_df_sorted, "allDF.txt"); 
 		
 //		analyzer.BuildCVocabulary(all_df_sorted);//Build Controlled vocabulary
 //		DocAnalyzer.OutputWordList(analyzer.m_CtrlVocabulary, "CtrlVocabulary.txt");
@@ -1723,41 +1925,41 @@ public class DocAnalyzer {
 		
 		// feature selection complete
 		analyzer.LoadVocabulary("CtrlVocabulary.txt");
-		analyzer.LoadQurey("./Data/samples/query.json");
+		analyzer.analyzeCtrlDocuments();// analyze documents only with the control vocabulary
+		analyzer.LoadQurey2("./Data/samples/query.json");
 		System.out.println("Building Sparse Vectors...");
 		analyzer.BuildSparseVec();
 		
 //		System.out.println("Creating language Models...");
-//		analyzer.createPosNegLanguageModel(m_reviews);
+//		analyzer.createPosNegLanguageModel(null);
 //		
 //		System.out.println("Calculating neg and pos probs...");
 //		List<Map.Entry<String, Double>> logprobs = analyzer.NBPosNegProb();
 //		DocAnalyzer.OutputWordCount2(logprobs, "probs.txt");
-//		
-//		
-////		DocAnalyzer.OutputWordCount2(result, "NBclassResult.txt");
-//		System.out.println("NB classfying...");
-//		
+//		System.out.println("processing different deltas...");
 //		List<Map.Entry<Double, double[]>> PRs = analyzer.multipleDeltaPR();
 //		DocAnalyzer.OutputPRList(PRs, "PRresults.csv");
 		
 		//Task 3.Random projection for KNN
 		// get all vector representation of a review. calc tfidf for all words
-		
+//		
 		System.out.println("building tf idf Sparse Vectors...");
 		analyzer.BuildSparseVec2();
 		System.out.println("building random projection buckets...");
 		analyzer.BuildRandProjBucket(5);
-		//do the Knn here
-		
-		
-		
+//	
+//		analyzer.KNNcompilation();
+//		
+//		
 		//Task 4.Cross Validation
 		
 		double[] CVresults = analyzer.CrossValidation(10);
+		System.out.println("Average: ");
+
+		for (int i = 0; i < CVresults.length; i++)
+			System.out.println(CVresults[i]);
 		
-		
-		
+		//Task 5. 
 		
 		System.out.println("Done!");
 	}

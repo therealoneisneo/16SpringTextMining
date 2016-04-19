@@ -148,6 +148,33 @@ public class Post {
 			m_vector.put(term, 1.0);
 	}
 	
+HashMap<String, Double> m_tfidf_vector; // suggested sparse structure for storing the vector space representation with N-grams for this document
+	
+	public void init_tfidf_SparseVec()
+	{
+		m_tfidf_vector = new HashMap<String, Double>();
+	}
+	
+	public HashMap<String, Double> get_tfidf_Vct() {
+		return m_tfidf_vector;
+	}
+	
+	public void Set_tfidf_Vct(String term, double value)
+	{
+		m_tfidf_vector.put(term, value);
+	}
+	
+	public void Add_tfidf_Vct(String term) {
+		if(m_tfidf_vector.containsKey(term))
+		{
+			double temp = m_tfidf_vector.get(term);
+			temp += 1;
+			m_tfidf_vector.put(term, temp);
+		}
+		else
+			m_tfidf_vector.put(term, 1.0);
+	}
+	
 	public double similiarity(Post p) {
 		double result = 0;
 		double m1 = 0;
