@@ -163,11 +163,16 @@ public class Post {
 		m_results.put(appname, score);	
 	}
 	
+	
 	public HashMap<String, Double> getResult()
 	{
 		return m_results;
 	}
 	
+	public void clearResult()
+	{
+		m_results.clear();
+	}
 	
 	HashMap<String, Double> m_vector; // suggested sparse structure for storing the vector space representation with N-grams for this document
 	

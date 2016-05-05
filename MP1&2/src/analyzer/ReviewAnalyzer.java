@@ -45,7 +45,8 @@ public class ReviewAnalyzer
 	ArrayList<Post> m_reviews; // the review part of the app
 	ArrayList<Post> m_queries;// query
 	
-	HashMap<String, Double> m_count; //  global df counts
+	HashMap<String, Double> m_count_d; //  global description df counts
+	HashMap<String, Double> m_count_r; //  global reviews df counts
 	double avl_d = 0;
 	double avl_r = 0;// the average length of discription and reviews.
 	
@@ -100,7 +101,8 @@ public class ReviewAnalyzer
 		m_tokenizer = new TokenizerME(new TokenizerModel(new FileInputStream(tokenModel)));
 		m_stopwords = new HashSet<String>();
 		m_CtrlVocabulary = new HashSet<String>();
-		m_count = new HashMap<String, Double>();
+		m_count_d = new HashMap<String, Double>();
+		m_count_r = new HashMap<String, Double>();
 		avl_d = 0;
 		avl_r = 0;// the average length of discription and reviews.
 		stemmer = new englishStemmer();
@@ -277,29 +279,45 @@ public class ReviewAnalyzer
 				}	
 			}
 			double temp = 0;
-			for (String tok : dfcheck)
-			{
-				if(m_count.containsKey(tok))
-				{
-					temp = m_count.get(tok);
-					temp += 1;
-					m_count.put(tok, temp);
-				}
-				else
-					m_count.put(tok, 1.0);
-			}
 			
+			double len_document = review.getVctCount();
 			if (parent.equals(nameID))
 			{
+				
+				for (String tok : dfcheck)
+				{
+					if(m_count_d.containsKey(tok))
+					{
+						temp = m_count_d.get(tok);
+						temp += 1;
+						m_count_d.put(tok, temp);
+					}
+					else
+						m_count_d.put(tok, 1.0);
+				}
+				
+				
 //				Dprint("Its a ", "Child");
 				m_discriptions.add(review);
-				avl_d += tokens.length;
+				avl_d += len_document;
 			}
 			else
 			{
+				
+				for (String tok : dfcheck)
+				{
+					if(m_count_r.containsKey(tok))
+					{
+						temp = m_count_r.get(tok);
+						temp += 1;
+						m_count_r.put(tok, temp);
+					}
+					else
+						m_count_r.put(tok, 1.0);
+				}
 //				Dprint("Its a ", "Parent");
 				m_reviews.add(review);
-				avl_r += tokens.length;
+				avl_r += len_document;
 			}
 //			m_reviews.add(review);
 //			}
@@ -332,7 +350,7 @@ public class ReviewAnalyzer
 	}
 	
 	
-	public double CalcScore(Post query, int i)
+	public double CalcScoreAll(Post query, int i)// calculate document scores within consideration of user reviews and discriptions.
 	{
 		
 		double result = 0;
@@ -342,27 +360,38 @@ public class ReviewAnalyzer
 		Set<String> tokens = q_vec.keySet();
 		Set<String> d_tokens = d_vec.keySet();
 		Set<String> r_tokens = r_vec.keySet();
+		int N = m_reviews.size() * 2;
+		double d_len = m_discriptions.get(i).getVctCount();
+		double r_len = m_reviews.get(i).getVctCount();
+		double k3 = 1000;
+		double k1 = 3.5;
+		double bd = 0.4;
+		double br = 0.3;
+		double boostd = 0.6;
+		double boostr = 0.4;
+		
 		
 		for (String tok : tokens)
 		{
 			if (d_tokens.contains(tok) || r_tokens.contains(tok))
 			{
 				double cwq = q_vec.get(tok);
-				double dfw = m_count.get(tok);
+				double dfw = 0;
+				if(m_count_d.containsKey(tok))
+					dfw += m_count_d.get(tok);
+				if(m_count_r.containsKey(tok))
+					dfw += m_count_r.get(tok);
 				double cwd = 0;
 				double cwr = 0;
 				if (d_tokens.contains(tok))
 					cwd = d_vec.get(tok);
 				if (r_tokens.contains(tok))
 					cwr = r_vec.get(tok);
-				int N = m_reviews.size() * 2;
-//				int d_len = d_tokens.size();
-//				int r_len = r_tokens.size();
-				double d_len = m_discriptions.get(i).getVctCount();
-				double r_len = m_reviews.get(i).getVctCount();
-				double cwa = ((0.6 * cwd) / (1 - 0.4 + 0.4 * d_len / avl_d)) +  (( 0.4 * cwr) / (1- 0.3 + 0.3 * r_len / avl_r));
-				double term1 = 1001 * cwq / (1000 + cwq);
-				double term2 = (4.5 * cwa) / (3.5 + cwa);
+
+
+				double cwa = ((boostd * cwd) / (1 - bd + bd * d_len / avl_d)) +  (( boostr * cwr) / (1- br + br * r_len / avl_r));
+				double term1 = (k3 + 1) * cwq / (k3 + cwq);
+				double term2 = ((k1 + 1) * cwa) / (k1 + cwa);
 				double term3 = Math.log((N + 1) / (dfw + 0.5));
 				result += term1 * term2 * term3;
 			}
@@ -372,22 +401,70 @@ public class ReviewAnalyzer
 	}
 	
 	
-	public void CalcDocumentScore() // calculate the score of all documents with all queries and the top results stored in each query individually
+	public double CalcScoreD(Post query, int i)// calculate document scores only with discriptions
 	{
-		int count1 = 0;
 		
+		double result = 0;
+		HashMap<String, Double> q_vec = query.getVct();
+		HashMap<String, Double> d_vec = m_discriptions.get(i).getVct();
+//		HashMap<String, Double> r_vec = m_reviews.get(i).getVct();
+		Set<String> tokens = q_vec.keySet();
+		Set<String> d_tokens = d_vec.keySet();
+//		Set<String> r_tokens = r_vec.keySet();
+		double k3 = 1000;
+		double k1 = 4;
+		double b = 0.4;
+		int N = m_discriptions.size();
+		double d_len = m_discriptions.get(i).getVctCount();
+		
+		for (String tok : tokens)
+		{
+			if (d_tokens.contains(tok))
+			{
+				double cwq = q_vec.get(tok);
+				double dfw = m_count_d.get(tok);
+				double cwdraw = 0;
+//				double cwd = 0;
+				if (d_tokens.contains(tok))
+					cwdraw = d_vec.get(tok);
+//				if (r_tokens.contains(tok))
+//					cwr = r_vec.get(tok);
+				
+//				int d_len = d_tokens.size();
+//				int r_len = r_tokens.size();
+				
+//				double r_len = m_reviews.get(i).getVctCount();
+//				double cwa = ((0.6 * cwd) / (1 - 0.4 + 0.4 * d_len / avl_d)) +  (( 0.4 * cwr) / (1- 0.3 + 0.3 * r_len / avl_r));
+				double cwd_prime = cwdraw / (1 - b + b * d_len / avl_d);
+				double term1 = (k3 + 1) * cwq / (k3 + cwq);
+				double term2 = ((k1 + 1) * cwd_prime) / (k1 + cwd_prime);
+				double term3 = Math.log((N + 1) / (dfw + 0.5));
+				result += term1 * term2 * term3;
+			}
+		}
+		
+		return result;
+	}
+	
+	public void CalcDocumentScore(int mode) // calculate the score of all documents with all queries and the top results stored in each query individually
+	{// mode = 0 means the only with discription
+		int count1 = 0;
+		double score = 0;
 		for (Post query : m_queries)
 		{
-			
+			query.clearResult();
 			System.out.println("Calculating Query " + String.valueOf(count1) + "'s score...");
 			count1++;
 			int count2 = -1;
 			for (int i = 0; i < m_discriptions.size(); i++)
 			{
 				count2++;
-				if (count2 % 100 == 0)
+				if (count2 % 1000 == 0)
 					System.out.println(String.valueOf(count1) + " : " + String.valueOf(count2));
-				double score = CalcScore(query, i);
+				if (mode == 0)
+					score = CalcScoreD(query, i);
+				else
+					score = CalcScoreAll(query, i);
 //				query.Addresult(m_discriptions.get(i).getTitle(), score, 20);
 				query.AddresultAll(m_discriptions.get(i).getTitle(), score);
 			}
@@ -486,8 +563,10 @@ public class ReviewAnalyzer
 		analyzer.LoadDirectory("./data/AppReview/parentData", ".json"); // in text categorizaiton, loading all json files
 		analyzer.avl_d /= analyzer.m_discriptions.size();
 		analyzer.avl_r /= analyzer.m_reviews.size();
-		analyzer.CalcDocumentScore();
-		analyzer.OutputResult("results.txt");
+		analyzer.CalcDocumentScore(0);
+		analyzer.OutputResult("results_donly.txt");
+		analyzer.CalcDocumentScore(1);
+		analyzer.OutputResult("results_all.txt");
 		
 
 //		all_TFs.putAll(analyzer.m_stats);
