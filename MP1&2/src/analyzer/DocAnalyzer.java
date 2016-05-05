@@ -72,7 +72,6 @@ public class DocAnalyzer {
 	// MP3, the positive and negative language model
 	LanguageModel m_PoslangModel;
 	LanguageModel m_NeglangModel;
-	
 	public DocAnalyzer(String tokenModel, int N) throws InvalidFormatException, FileNotFoundException, IOException {
 
 		m_N = N;

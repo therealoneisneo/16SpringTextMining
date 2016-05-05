@@ -180,6 +180,17 @@ public class Post {
 		return m_vector;
 	}
 	
+	public double getVctCount()// get the total count of vector
+	{
+		double result = 0;
+		for (Map.Entry<String, Double> entry : m_vector.entrySet())
+		{
+			result += entry.getValue();
+		}
+		return result;
+		
+	}
+	
 	public void SetVct(String term, double value)
 	{
 		m_vector.put(term, value);

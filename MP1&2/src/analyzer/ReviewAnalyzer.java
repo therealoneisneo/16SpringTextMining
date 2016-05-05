@@ -13,18 +13,20 @@ import java.util.Map.Entry;
 
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
-import org.tartarus.snowball.ext.porterStemmer;
+//import org.tartarus.snowball.ext.porterStemmer;
 
-import json.JSONArray;
+//import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
 import opennlp.tools.tokenize.Tokenizer;
 import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
 import opennlp.tools.util.InvalidFormatException;
-import structures.LanguageModel;
+//import structures.LanguageModel;
 import structures.Post;
 import structures.Token;
+
+import org.jsoup.*;
 
 /**
  * @author Jinlong
@@ -51,6 +53,17 @@ public class ReviewAnalyzer
 //	HashMap<String, Integer> m_classtruth;// the review true pos and neg
 	//we have also provided a sample implementation of language model in src.structures.LanguageModel
 	Tokenizer m_tokenizer;
+	
+	//==========================These variables declaired for global use to refine the garbage collection 
+	String nameID;
+	String parent;
+	String title;
+//	String sentences = json.getString("sentences");
+	String content;
+	String[] tokens;
+	SnowballStemmer stemmer;
+	//==========================
+	
 	
 	//this structure is for language modeling
 //	LanguageModel m_langModel;
@@ -90,6 +103,7 @@ public class ReviewAnalyzer
 		m_count = new HashMap<String, Double>();
 		avl_d = 0;
 		avl_r = 0;// the average length of discription and reviews.
+		stemmer = new englishStemmer();
 	}
 	
 	public JSONObject LoadJson(String filename) {
@@ -229,21 +243,22 @@ public class ReviewAnalyzer
 	public void analyzeDocument(JSONObject json) {		
 		try {
 //			JSONArray jarray = json.getJSONArray("");
-			String nameID = json.getString("name");
-			String parent = json.getString("parent");
-			String title = json.getString("title");
-			String sentences = json.getString("sentences");
-			String content = json.getString("content");
+			nameID = json.getString("name");
+			parent = json.getString("parent");
+			title = json.getString("title");
+//			String sentences = json.getString("sentences");
+			content = json.getString("content");
 //			Dprint("name", nameID);
 //			Dprint("parent", parent);
 //			Dprint("title", title);
 //			Dprint("sentences", sentences);
 //			Dprint("content", content);
 			Post review = new Post(nameID);
-			String[] tokens = Tokenize(content);
+			content = Jsoup.parse(content).text();//get rid of the HTML structures
+			tokens = Tokenize(content);
 			for (int i = 0; i < tokens.length; i++)
 				tokens[i] = SnowballStemming(Normalization(tokens[i]));
-			review.setTokens(tokens);
+//			review.setTokens(tokens);
 			review.setTitle(title);
 			
 			HashSet<String> dfcheck;
@@ -254,18 +269,19 @@ public class ReviewAnalyzer
 //				if (m_stopwords.contains(tok))
 //					continue;
 //				tok = SnowballStemming(Normalization(tok));
-				if (tok.length() != 0)
+//				if (tok.length() != 0)
+				if (m_CtrlVocabulary.contains(tok))
 				{
 					dfcheck.add(tok);
 					review.AddVct(tok);	
 				}	
 			}
-			
+			double temp = 0;
 			for (String tok : dfcheck)
 			{
 				if(m_count.containsKey(tok))
 				{
-					double temp = m_count.get(tok);
+					temp = m_count.get(tok);
 					temp += 1;
 					m_count.put(tok, temp);
 				}
@@ -302,15 +318,14 @@ public class ReviewAnalyzer
 			if (f.isFile() && f.getName().endsWith(suffix))
 			{
 				analyzeDocument(LoadJson(f.getAbsolutePath()));
-//				System.out.println(m_stats.size());
 			}
 			else if (f.isDirectory())
 				LoadDirectory(f.getAbsolutePath(), suffix);
-			if(count % 100 == 0)
+			if(count % 50 == 0)
 				System.out.println(count);
-//			if (count == 300)
+//			if (count == 1000)
 //				break;
-//			break;//debug
+//			
 		}
 		
 		System.out.println(count + " files loaded  from " + folder + "...");
@@ -340,9 +355,11 @@ public class ReviewAnalyzer
 					cwd = d_vec.get(tok);
 				if (r_tokens.contains(tok))
 					cwr = r_vec.get(tok);
-				int N = m_reviews.size();
-				int d_len = d_tokens.size();
-				int r_len = r_tokens.size();
+				int N = m_reviews.size() * 2;
+//				int d_len = d_tokens.size();
+//				int r_len = r_tokens.size();
+				double d_len = m_discriptions.get(i).getVctCount();
+				double r_len = m_reviews.get(i).getVctCount();
 				double cwa = ((0.6 * cwd) / (1 - 0.4 + 0.4 * d_len / avl_d)) +  (( 0.4 * cwr) / (1- 0.3 + 0.3 * r_len / avl_r));
 				double term1 = 1001 * cwq / (1000 + cwq);
 				double term2 = (4.5 * cwa) / (3.5 + cwa);
@@ -368,7 +385,7 @@ public class ReviewAnalyzer
 			for (int i = 0; i < m_discriptions.size(); i++)
 			{
 				count2++;
-				if (count2 % 1000 == 0)
+				if (count2 % 100 == 0)
 					System.out.println(String.valueOf(count1) + " : " + String.valueOf(count2));
 				double score = CalcScore(query, i);
 //				query.Addresult(m_discriptions.get(i).getTitle(), score, 20);
@@ -413,6 +430,42 @@ public class ReviewAnalyzer
 		}
 	}
 	
+	public List<String> LoadVocabulary(String filename) {
+		List<String> VList = new ArrayList<String>();
+		try {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(filename), "UTF-8"));
+			String line;
+//			List<String> testlist = new ArrayList<String>();
+			
+			
+			while ((line = reader.readLine()) != null) {
+				//it is very important that you perform the same processing operation to the loaded stopwords
+				//otherwise it won't be matched in the text content
+//				String temp;
+//				temp = SnowballStemming(Normalization(line));
+				if (!line.isEmpty())
+				{
+					if (m_CtrlVocabulary.contains(line))
+					{
+						VList.add(line);
+						System.out.println(line);
+					}
+					m_CtrlVocabulary.add(line);
+//					testlist.add(line);
+				}
+					
+//					System.out.println(line);
+			}
+			reader.close();
+			System.out.format("Loading %d controlled vocabulary from %s\n", m_CtrlVocabulary.size(), filename);
+			
+		} catch(IOException e){
+			System.err.format("[Error]Failed to open file %s!!", filename);
+		}
+		return VList;
+	}
+	
+	
 	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException 
 	{	
 		System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
@@ -420,6 +473,7 @@ public class ReviewAnalyzer
 		ReviewAnalyzer analyzer = new ReviewAnalyzer("./data/Model/en-token.bin", 1);
 		analyzer.LoadQueryInit("./data/AppReview/queryID.txt");
 //		analyzer.LoadQueryScores("./data/AppReview/query-app-relevance");
+		analyzer.LoadVocabulary("./data/AppReview/CtrlVocabulary.txt");
 		
 //		HashMap<String, Token> all_TFs, all_DFs;
 //		all_TFs = new HashMap<String, Token>();
