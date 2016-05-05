@@ -4,6 +4,7 @@
 package structures;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import json.JSONException;
 import json.JSONObject;
@@ -87,6 +88,15 @@ public class Post {
 	public boolean isEmpty() {
 		return m_content==null || m_content.isEmpty();
 	}
+	
+	String m_title; // the apps title	
+	public String getTitle() {
+		return m_title;
+	}
+
+	public void setTitle(String title) {
+		this.m_title = title;
+	}
 
 	//timestamp of the post
 	String m_date;
@@ -110,6 +120,8 @@ public class Post {
 
 	public Post(String ID) {
 		m_ID = ID;
+		initSparseVec();
+		m_results = new HashMap<String, Double>();
 	}
 	
 	String[] m_tokens; // we will store the tokens 
@@ -120,6 +132,42 @@ public class Post {
 	public void setTokens(String[] tokens) {
 		m_tokens = tokens;
 	}
+	
+	HashMap<String, Double> m_results; // for query use :the app name and its score
+	public void Addresult(String appname, double score, int size) //maintain the top "size" number of results
+	{
+		if (m_results.size() < size)
+			m_results.put(appname, score);
+		else
+		{
+			double min_score = 10000000;
+			String min_appname = ""; 
+			for (Map.Entry<String, Double> entry : m_results.entrySet())
+			{
+				if (entry.getValue() < min_score)
+				{
+					min_score = entry.getValue();
+					min_appname = entry.getKey();
+				}
+			}
+			if (score > min_score)
+			{
+				m_results.remove(min_appname);
+				m_results.put(appname, score);
+			}
+		}
+	}
+	
+	public void AddresultAll(String appname, double score) // all results
+	{
+		m_results.put(appname, score);	
+	}
+	
+	public HashMap<String, Double> getResult()
+	{
+		return m_results;
+	}
+	
 	
 	HashMap<String, Double> m_vector; // suggested sparse structure for storing the vector space representation with N-grams for this document
 	

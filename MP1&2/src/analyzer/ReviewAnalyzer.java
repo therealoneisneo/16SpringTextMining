@@ -9,13 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Random;
 
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
@@ -49,8 +43,9 @@ public class ReviewAnalyzer
 	ArrayList<Post> m_reviews; // the review part of the app
 	ArrayList<Post> m_queries;// query
 	
-	HashMap<String, Token> m_count; // token df counts
-
+	HashMap<String, Double> m_count; //  global df counts
+	double avl_d = 0;
+	double avl_r = 0;// the average length of discription and reviews.
 	
 //	HashMap<String, Integer> m_ID_Index_map; // hash map mapping review id and the index in m_reviews
 //	HashMap<String, Integer> m_classtruth;// the review true pos and neg
@@ -63,7 +58,23 @@ public class ReviewAnalyzer
 //	LanguageModel m_PoslangModel;
 //	LanguageModel m_NeglangModel;
 	
-	
+	public static List<Map.Entry<String, Double>> SortHashMap_double(HashMap<String, Double> wordlist)
+	{
+		List<Map.Entry<String, Double>> entrylist = new ArrayList<Map.Entry<String, Double>>(wordlist.entrySet());
+
+		Collections.sort(entrylist, new Comparator<Map.Entry<String, Double>>()
+			{public int compare(Map.Entry<String, Double> o1, Map.Entry<String, Double> o2)
+				{
+					if (o2.getValue() > o1.getValue())
+						return 1;
+					else if(o2.getValue() == o1.getValue())
+						return 0;
+					else
+						return -1;
+				}
+			});
+		return entrylist;
+	}
 	
 	public ReviewAnalyzer(String tokenModel, int N) throws InvalidFormatException, FileNotFoundException, IOException {
 
@@ -76,6 +87,9 @@ public class ReviewAnalyzer
 		m_tokenizer = new TokenizerME(new TokenizerModel(new FileInputStream(tokenModel)));
 		m_stopwords = new HashSet<String>();
 		m_CtrlVocabulary = new HashSet<String>();
+		m_count = new HashMap<String, Double>();
+		avl_d = 0;
+		avl_r = 0;// the average length of discription and reviews.
 	}
 	
 	public JSONObject LoadJson(String filename) {
@@ -139,60 +153,139 @@ public class ReviewAnalyzer
 			return token;
 	}
 	
+	public void LoadQueryInit(String filename) // init read in query 
+	{
+		try {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(filename), "UTF-8"));
+			String line;
+			System.out.println("Loading query...");
+
+			while ((line = reader.readLine()) != null)
+			{
+				String[] q = line.split("\t");
+//				for (String str : q)
+//					System.out.println(str);
+				Post query = new Post(q[0]);
+				String[] tokens = Tokenize(q[1]);
+				for (int i = 0; i < tokens.length; i++)
+					tokens[i] = SnowballStemming(Normalization(tokens[i]));
+				query.setTokens(tokens);
+				query.setContent(q[1]);
+				for (String tok : tokens)
+				{
+//					tok = SnowballStemming(Normalization(tok));
+					if (tok.length() != 0)
+						query.AddVct(tok);
+				}
+				m_queries.add(query);
+				
+			}
+			reader.close();
+		} catch(IOException e){
+			System.err.format("[Error]Failed to open file %s!!", filename);
+		}
+	}
+	
+//	public void LoadQueryScores(String filename) // load in query ground truth
+//	{
+//		try {
+//			BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(filename), "UTF-8"));
+//			String line;
+//			HashMap<String, String> content_ID = new HashMap<String, String>();
+//			for (Post po : m_queries)
+//			{
+//				content_ID.put(po.getContent(), po.getID());
+//			}
+//			
+//			while ((line = reader.readLine()) != null)
+//			{
+//				System.out.println(line);
+//				String[] q = line.split("\t");
+//				for (String str : q)
+//				{
+//					System.out.println(str);
+//				}
+//				int index = Integer.parseInt(content_ID.get(q[0]));
+//				
+////				if (!m_queries.get(index).getContent().equals(q[0]))
+////				{
+////					System.out.println("error : query index and query content does not match! ");
+////					return;
+////				}
+//				m_queries.get(index).Addresult(q[1], Double.parseDouble(q[2]), 20);
+////				break;
+//			}
+//			reader.close();
+//		} catch(IOException e){
+//			System.err.format("[Error]Failed to open file %s!!", filename);
+//		}
+//	}
+	
+	public void Dprint(String title, String content)
+	{
+		System.out.println(title + " : " + content);
+	}
+	
 	public void analyzeDocument(JSONObject json) {		
 		try {
-			JSONArray jarray = json.getJSONArray("");
-			int a = 0;
-			int b = a;
-//			HashSet<String> dfcheck;
-//			dfcheck = new HashSet<String>();
-//			for(int i=0; i<jarray.length(); i++) {
-//				Post review = new Post(jarray.getJSONObject(i));
-//				String[] tokens = Tokenize(review.getContent());
-//				review.setTokens(tokens);
-//
-//				dfcheck.clear();
-				
-//				for (String tok : tokens)
-//				{
-//					if (m_stopwords.contains(tok))
-//						continue;
-//					tok = SnowballStemming(Normalization(tok));
-//					if (tok.length() != 0)
-//					{
-//						dfcheck.add(tok);
-//						if (m_stats.containsKey(tok))
-//						{
-//							Token temp = m_stats.get(tok);
-//							temp.setValue(temp.getValue() + 1); // increase count by 1
-//						}
-//						else
-//						{
-//							Token newt = new Token(m_stats.size(), tok);
-//							newt.setValue(1); 
-//							newt.setPosNeg(review.getRating());
-//							m_stats.put(tok, newt);
-//						}
-//					}
-//					
-//				}
-//				
-//				for (String tok : dfcheck)
-//				{
-//					if (m_dfstats.containsKey(tok))
-//					{
-//						Token temp = m_dfstats.get(tok);
-//						temp.setValue(temp.getValue() + 1); // increase count by 1
-//					}
-//					else
-//					{
-//						Token newt = new Token(m_dfstats.size(), tok);
-//						newt.setValue(1); 
-//						m_dfstats.put(tok, newt);
-//					}
-//				}
-				
-//				m_reviews.add(review);
+//			JSONArray jarray = json.getJSONArray("");
+			String nameID = json.getString("name");
+			String parent = json.getString("parent");
+			String title = json.getString("title");
+			String sentences = json.getString("sentences");
+			String content = json.getString("content");
+//			Dprint("name", nameID);
+//			Dprint("parent", parent);
+//			Dprint("title", title);
+//			Dprint("sentences", sentences);
+//			Dprint("content", content);
+			Post review = new Post(nameID);
+			String[] tokens = Tokenize(content);
+			for (int i = 0; i < tokens.length; i++)
+				tokens[i] = SnowballStemming(Normalization(tokens[i]));
+			review.setTokens(tokens);
+			review.setTitle(title);
+			
+			HashSet<String> dfcheck;
+			dfcheck = new HashSet<String>();
+			
+			for (String tok : tokens)
+			{
+//				if (m_stopwords.contains(tok))
+//					continue;
+//				tok = SnowballStemming(Normalization(tok));
+				if (tok.length() != 0)
+				{
+					dfcheck.add(tok);
+					review.AddVct(tok);	
+				}	
+			}
+			
+			for (String tok : dfcheck)
+			{
+				if(m_count.containsKey(tok))
+				{
+					double temp = m_count.get(tok);
+					temp += 1;
+					m_count.put(tok, temp);
+				}
+				else
+					m_count.put(tok, 1.0);
+			}
+			
+			if (parent.equals(nameID))
+			{
+//				Dprint("Its a ", "Child");
+				m_discriptions.add(review);
+				avl_d += tokens.length;
+			}
+			else
+			{
+//				Dprint("Its a ", "Parent");
+				m_reviews.add(review);
+				avl_r += tokens.length;
+			}
+//			m_reviews.add(review);
 //			}
 		} catch (JSONException e) {
 			e.printStackTrace();
@@ -201,8 +294,11 @@ public class ReviewAnalyzer
 	
 	public void LoadDirectory(String folder, String suffix) {
 		File dir = new File(folder);
-		int size = m_reviews.size();
-		for (File f : dir.listFiles()) {
+		int count = 0;
+		System.out.println("Loading files from " + folder + "...");
+		for (File f : dir.listFiles()) 
+		{
+			count += 1;
 			if (f.isFile() && f.getName().endsWith(suffix))
 			{
 				analyzeDocument(LoadJson(f.getAbsolutePath()));
@@ -210,49 +306,136 @@ public class ReviewAnalyzer
 			}
 			else if (f.isDirectory())
 				LoadDirectory(f.getAbsolutePath(), suffix);
-			
-			break;//debug
+			if(count % 100 == 0)
+				System.out.println(count);
+//			if (count == 300)
+//				break;
+//			break;//debug
 		}
-//		size = m_reviews.size() - size;
-//		if (m_train_num < 0)
-//		{
-//			m_train_num = size;
-//		}
-//		else if (m_test_num < 0)
-//		{
-//			m_test_num = size;
-//		}
-		System.out.println("Loading " + size + " review documents from " + folder);
+		
+		System.out.println(count + " files loaded  from " + folder + "...");
+	}
+	
+	
+	public double CalcScore(Post query, int i)
+	{
+		
+		double result = 0;
+		HashMap<String, Double> q_vec = query.getVct();
+		HashMap<String, Double> d_vec = m_discriptions.get(i).getVct();
+		HashMap<String, Double> r_vec = m_reviews.get(i).getVct();
+		Set<String> tokens = q_vec.keySet();
+		Set<String> d_tokens = d_vec.keySet();
+		Set<String> r_tokens = r_vec.keySet();
+		
+		for (String tok : tokens)
+		{
+			if (d_tokens.contains(tok) || r_tokens.contains(tok))
+			{
+				double cwq = q_vec.get(tok);
+				double dfw = m_count.get(tok);
+				double cwd = 0;
+				double cwr = 0;
+				if (d_tokens.contains(tok))
+					cwd = d_vec.get(tok);
+				if (r_tokens.contains(tok))
+					cwr = r_vec.get(tok);
+				int N = m_reviews.size();
+				int d_len = d_tokens.size();
+				int r_len = r_tokens.size();
+				double cwa = ((0.6 * cwd) / (1 - 0.4 + 0.4 * d_len / avl_d)) +  (( 0.4 * cwr) / (1- 0.3 + 0.3 * r_len / avl_r));
+				double term1 = 1001 * cwq / (1000 + cwq);
+				double term2 = (4.5 * cwa) / (3.5 + cwa);
+				double term3 = Math.log((N + 1) / (dfw + 0.5));
+				result += term1 * term2 * term3;
+			}
+		}
+		
+		return result;
+	}
+	
+	
+	public void CalcDocumentScore() // calculate the score of all documents with all queries and the top results stored in each query individually
+	{
+		int count1 = 0;
+		
+		for (Post query : m_queries)
+		{
+			
+			System.out.println("Calculating Query " + String.valueOf(count1) + "'s score...");
+			count1++;
+			int count2 = -1;
+			for (int i = 0; i < m_discriptions.size(); i++)
+			{
+				count2++;
+				if (count2 % 1000 == 0)
+					System.out.println(String.valueOf(count1) + " : " + String.valueOf(count2));
+				double score = CalcScore(query, i);
+//				query.Addresult(m_discriptions.get(i).getTitle(), score, 20);
+				query.AddresultAll(m_discriptions.get(i).getTitle(), score);
+			}
+		}
+	}
+	public void OutputResult(String filename)// output the query result
+	{
+		try
+		{
+			File writename = new File(filename);
+			writename.createNewFile();
+			BufferedWriter out = new BufferedWriter(new FileWriter(writename));  
+			
+			for (int i = 0; i < m_queries.size(); i++)
+			{
+				Post query = m_queries.get(i);
+				List<Map.Entry<String, Double>> results = SortHashMap_double(query.getResult());
+				out.write(String.valueOf(i));
+				System.out.print("Exporting Resulf of query " + String.valueOf(i) + "...");
+				for (int j = 0; j < results.size(); j++)
+				{
+					out.write('\t' + results.get(j).getKey() + ':' + String.valueOf(results.get(j).getValue()));
+//					System.out.print('\t' + results.get(j).getKey() + ':' + String.valueOf(results.get(j).getValue()));
+				}
+				out.write("\r\n");
+				System.out.print("\r\n");
+			}
+			
+//			for (Entry<String, Double> entry : entrylist)
+//			{
+//				out.write(entry.getKey() + "," + entry.getValue() + "\r\n");
+//			}
+				
+			out.flush();
+			out.close(); 
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
 	}
 	
 	public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException 
 	{	
 		System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
-		
+//		String rootdir = "~/Workspace/Sp16/MP1&2/";
 		ReviewAnalyzer analyzer = new ReviewAnalyzer("./data/Model/en-token.bin", 1);
-//		DocAnalyzer analyzer2 = new DocAnalyzer("./data/Model/en-token.bin", 2);
-
-		//code for demonstrating tokenization and stemming
-//		analyzer.TokenizerDemon("I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
-		// analyzer.TokenizerDemon("this is just a test sentence for the function");
-			
-		//entry point to deal with a collection of documents
+		analyzer.LoadQueryInit("./data/AppReview/queryID.txt");
+//		analyzer.LoadQueryScores("./data/AppReview/query-app-relevance");
+		
 //		HashMap<String, Token> all_TFs, all_DFs;
 //		all_TFs = new HashMap<String, Token>();
 //		all_DFs = new HashMap<String, Token>();
 //		analyzer.LoadStopwords("init_stop_words.txt");
 //		analyzer2.LoadStopwords("init_stop_words.txt");
-		analyzer.LoadDirectory("./data/AppReview/childDatas", ".json");
-		analyzer.LoadDirectory("./data/AppReview/parentDatas", ".json"); // in text categorizaiton, loading all json files
-//		analyzer2.LoadDirectory("./Data/yelp/train", ".json");
-//		
-//		all_DFs.putAll(analyzer.m_dfstats);
-////		all_DFs.putAll(analyzer2.m_dfstats);
-////		
-////		
-////		analyzer.LoadDirectory("./Data/yelp/test", ".json");
-////		analyzer2.LoadDirectory("./Data/yelp/test", ".json");
-////
+		
+		
+		analyzer.LoadDirectory("./data/AppReview/childData", ".json");
+		analyzer.LoadDirectory("./data/AppReview/parentData", ".json"); // in text categorizaiton, loading all json files
+		analyzer.avl_d /= analyzer.m_discriptions.size();
+		analyzer.avl_r /= analyzer.m_reviews.size();
+		analyzer.CalcDocumentScore();
+		analyzer.OutputResult("results.txt");
+		
+
 //		all_TFs.putAll(analyzer.m_stats);
 ////		all_TFs.putAll(analyzer2.m_stats);
 ////		
@@ -289,70 +472,7 @@ public class ReviewAnalyzer
 ////		
 ////		SimiAnalyzer.CalcSimi();
 //		
-////		//*******************************************************
-//		// MP2 starts here
-////		analyzer.LoadLMDir("./data/yelp/train", ".json");
-////		analyzer.createLanguageModel();
-////		System.out.println("build unigram model complete...");
-////		analyzer2.LoadLMDir("./data/yelp/train", ".json");
-////		analyzer2.createLanguageModel();
-////		System.out.println("build bigram model complete...");
-////		
-////		LanguageModel unigram = analyzer.m_langModel;
-////		LanguageModel bigram = analyzer2.m_langModel;
-////		bigram.setRefModel(unigram);
-////		bigram.setUniKeySet(unigram.getModel().keySet());
-////		
-//////		HashMap<String, Token> unimodel = analyzer.m_langModel.getModel();
-////		List<Map.Entry<String, Double>> q1 = bigram.ProbQuery("good", "lin");
-////		List<Map.Entry<String, Double>> q2 = bigram.ProbQuery("good", "abs");
-////		for (int i = 0; i < 10; i++)
-////		{
-////			System.out.println(q1.get(i).getKey() + " : " + q1.get(i).getValue());
-////			System.out.println(q2.get(i).getKey() + " : " + q2.get(i).getValue());
-////			System.out.println("-------------------");
-////		}
-////		
-////
-////		List<String> uniSen, biSenLin, biSenAbs;
-////		uniSen = new ArrayList<String>();
-////		biSenLin = new ArrayList<String>();
-////		biSenAbs = new ArrayList<String>();
-////		for (int i = 0; i < 10; i++)
-////		{
-////			String temp;
-////			System.out.println("Generating the " + i + "th sentence...");
-////			
-////			temp = unigram.genSentance(15, 1, "lin");
-////			System.out.print(temp);
-////			uniSen.add(temp);
-////			
-////			temp = bigram.genSentance(15, 2, "lin");
-////			System.out.print(temp);
-////			biSenLin.add(temp);
-////			
-////			temp = bigram.genSentance(15, 2, "abs");
-////			System.out.print(temp);
-////			biSenAbs.add(temp);
-////		}
-////		
-////		OutputWordList(uniSen, "uniSentence.txt");
-////		OutputWordList(biSenLin, "biSentenceLin.txt");
-////		OutputWordList(biSenAbs, "biSentenceAbs.txt");
-////		
-////		
-////		analyzer.clearReview();
-////		analyzer.LoadLMDir("./data/yelp/test", ".json");
-////		System.out.println("reviews in test set loaded.");
-////		double pp1, pp2, pp3;
-////		pp1 = analyzer.PPcalc(unigram, "lin");
-////		System.out.println("pp1 : " + pp1);
-////		pp2 = analyzer.PPcalc(bigram, "lin");
-////		System.out.println("pp2 : " + pp2);
-////		pp3 = analyzer.PPcalc(bigram, "abs");
-////		System.out.println("pp3 : " + pp3);
-////		
-////		System.out.println("complete.");
+
 
 		
 		System.out.println("Done!");
